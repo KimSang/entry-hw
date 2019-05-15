@@ -1,0 +1,28 @@
+{
+	"id": "FFFF",
+	"name": {
+		"en": "RQ Robot",
+		"ko": "RQ 로봇"
+	},
+	"category": "robot",
+	"platform": ["win32"],
+	"icon" : "rq_robot.png",
+	"module": "rq_robot.js",
+	"driver": {
+        "win32-ia32": "RQ_Robot/CP210xVCPInstaller_x86.exe",
+        "win32-x64": "RQ_Robot/CP210xVCPInstaller_x64.exe"
+    },
+	"url": "https://www.robobuilder.co.kr/goods/goods_list.php?cateCd=006",
+	"entry": {
+		"protocol": "json"
+	},
+	"reconnect" : true,
+	"select_com_port": true,
+	"hardware": {
+		"type": "serial",
+		"control": "slave",
+		"vendor": "ROBOBUILDER",
+		"duration": 32,
+		"baudRate": 115200
+	}
+}
