@@ -4,9 +4,7 @@ const BaseModule = require('./baseModule');
 class rq_robot extends BaseModule {
     constructor() {
         super();
-        this.counter = 0;
-        this.commandResponseSize = 8;
-        this.wholeResponseSize = 0x32;
+
         this.isSendInitData = false;
         this.isSensorCheck = false;
         this.isConnect = false;
@@ -14,165 +12,26 @@ class rq_robot extends BaseModule {
         this.sp = null;
         this.handler = null;
         this.config = null;
+        this.com_port = null;
 
         this.sensors = [];
         this.CHECK_PORT_MAP = {};
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
+
         this.motorMovementTypes = {
             Degrees: 0,
             Power: 1,
         };
-        this.deviceTypes = {
-            NxtTouch: 1,
-            NxtLight: 2,
-            NxtSound: 3,
-            NxtColor: 4,
-            NxtUltrasonic: 5,
-            NxtTemperature: 6,
-            LMotor: 7,
-            MMotor: 8,
-            Touch: 0x0e,
-            Color: 0x1d,
-            Ultrasonic: 0x1e,
-            Gyroscope: 0x20,
-            Infrared: 0x21,
-            Initializing: 0x7d,
-            Empty: 0x7e, // 126
-            WrongPort: 0x7f,
-            Unknown: 0xff,
-        };
+
         this.outputPort = {
-            A: 1,
-            B: 2,
-            C: 4,
-            D: 8,
-            ALL: 0x0f,
+            READ: 1,
+            WRITE: 2,
+            READ_WRITE: 4,
         };
-        this.PORT_MAP = {
-            A: {
-                type: this.motorMovementTypes.Power,
-                power: 0,
-            },
-            B: {
-                type: this.motorMovementTypes.Power,
-                power: 0,
-            },
-            C: {
-                type: this.motorMovementTypes.Power,
-                power: 0,
-            },
-            D: {
-                type: this.motorMovementTypes.Power,
-                power: 0,
-            },
-        };
-        this.BUTTON_MAP = {
-            UP: {
-                key: 1,
-            },
-            DOWN: {
-                key: 3,
-            },
-            LEFT: {
-                key: 5,
-            },
-            RIGHT: {
-                key: 4,
-            },
-            BACK: {
-                key: 6,
-            },
-            ENTER: {
-                key: 2,
-            },
-        };
-        this.STATUS_COLOR_MAP = {
-            OFF: {
-                key: 0,
-            },
-            GREEN: {
-                key: 1,
-            },
-            RED: {
-                key: 2,
-            },
-            ORANGE: {
-                key: 3,
-            },
-            GREEN_FLASH: {
-                key: 4,
-            },
-            RED_FLASH: {
-                key: 5,
-            },
-            ORANGE_FLASH: {
-                key: 6,
-            },
-            GREEN_PULSE: {
-                key: 7,
-            },
-            RED_PULSE: {
-                key: 8,
-            },
-            ORANGE_PULSE: {
-                key: 9,
-            },
-        };
-        this.CURRENT_STATUS_COLOR = {
-            COLOR: this.STATUS_COLOR_MAP.GREEN,
-            APPLIED: true,
-        };
-        this.SENSOR_MAP = {
-            '1': {
-                type: this.deviceTypes.Touch,
-                mode: 0,
-            },
-            '2': {
-                type: this.deviceTypes.Touch,
-                mode: 0,
-            },
-            '3': {
-                type: this.deviceTypes.Touch,
-                mode: 0,
-            },
-            '4': {
-                type: this.deviceTypes.Touch,
-                mode: 0,
-            },
-        };
+
         this.isSensing = false;
         this.LAST_PORT_MAP = null;
-    }
-
-    /**
-     * Direct Send Command 의 앞 부분을 설정한다.
-     *
-     * @returns {Buffer} size(2byte) + counter(2byte) + mode(1byte) + header(2byte)
-     * @param replyModeByte 0x00(reply required), 0x80(no reply)
-     * @param allocHeaderByte 할당된 결과값 byte 수를 나타낸다. 이 값이 4인 경우, 4byte 를 result value 로 사용한다.
-     */
-    makeInitBuffer(replyModeByte, allocHeaderByte) {
-        const size = new Buffer([0xff, 0xff]); // dummy 에 가깝다. #checkByteSize 에서 갱신된다.
-        const counter = this.getCounter();
-        const reply = new Buffer(replyModeByte);
-        const header = new Buffer(allocHeaderByte);
-        return Buffer.concat([size, counter, reply, header]);
-    }
-
-    /**
-     * 카운터를 가져온다. 카운터 값은 request & response 가 동일하여, 정상값 체크를 위해 사용된다.
-     * 이 값은 2^15 이상인 경우 0으로 초기화한다.
-     * @returns {Buffer} little endian 2byte
-     */
-    getCounter() {
-        let counterBuf = new Buffer(2);
-        counterBuf.writeInt16LE(this.counter);
-        if (this.counter >= 32767) {
-            this.counter = 0;
-        }
-        this.counter++;
-        return counterBuf;
     }
 
     MakeCommand(nCommand, bySize, contents)
@@ -642,7 +501,7 @@ class rq_robot extends BaseModule {
             });
             
         }
-        return true;
+        return null;
     }
 
     checkInitialData(data, config) {
@@ -700,198 +559,22 @@ class rq_robot extends BaseModule {
 
     // Web Socket 데이터 처리
     handleRemoteData(handler) {
-        Object.keys(this.PORT_MAP).forEach((port) => {
-            this.PORT_MAP[port] = handler.read(port);
-        });
-        Object.keys(this.SENSOR_MAP).forEach((port) => {
-            this.SENSOR_MAP[port] = handler.read(port);
-        });
 
-        const receivedStatusColor = this.STATUS_COLOR_MAP[
-            handler.read('STATUS_COLOR')
-        ];
-        if (
-            receivedStatusColor !== undefined &&
-            this.CURRENT_STATUS_COLOR.COLOR !== receivedStatusColor
-        ) {
-            this.CURRENT_STATUS_COLOR = {
-                COLOR: receivedStatusColor,
-                APPLIED: false,
-            };
+        for(var key in this.outputPort)
+        {
+            console.log(this.outputPort[key]);
+
+            let data = handler.read(this.outputPort[key]);
+            console.log(data);
         }
+
+        console.log("handleRemoteData");
     }
 
     // 하드웨어에 전달할 데이터
     requestLocalData() {
-        let isSendData = false;
-        const initBuf = this.makeInitBuffer([0x80], [0, 0]);
-        let sendBody;
-        this.sensorCheck();
-        let skipPortOutput = false;
-
-        //이전 포트결과에서 변한부분이 있는지 확인
-        if (this.LAST_PORT_MAP) {
-            const arr = Object.keys(this.PORT_MAP).filter((port) => {
-                const map1 = this.PORT_MAP[port];
-                const map2 = this.LAST_PORT_MAP[port];
-                return !(map1.type === map2.type && map1.power === map2.power);
-            });
-            skipPortOutput = arr.length === 0;
-        }
-
-        //변한부분이 있다면 포트에 보낼 데이터를 생성
-        if (!skipPortOutput) {
-            isSendData = true;
-            this.LAST_PORT_MAP = _.cloneDeep(this.PORT_MAP);
-            sendBody = this.makePortCommandBuffer(isSendData);
-        }
-
-        //상판 LED 컬러 변경 요청이 있는 경우 변경 커맨드를 페이로드에 추가
-        if (this.CURRENT_STATUS_COLOR.APPLIED === false) {
-            isSendData = true;
-            const statusLedCommand = this.makeStatusColorCommandBuffer(
-                sendBody
-            );
-
-            if (!sendBody) {
-                sendBody = statusLedCommand;
-            } else {
-                sendBody = Buffer.concat([sendBody, statusLedCommand]);
-            }
-        }
-
-        if (isSendData && sendBody) {
-            const totallength = initBuf.length + sendBody.length;
-            const sendBuffer = Buffer.concat([initBuf, sendBody], totallength);
-            this.checkByteSize(sendBuffer);
-            return sendBuffer;
-        }
 
         return null;
-    }
-
-    makeStatusColorCommandBuffer() {
-        this.CURRENT_STATUS_COLOR.APPLIED = true;
-        const statusLedCommand = new Buffer([
-            0x82,
-            0x1b,
-            this.CURRENT_STATUS_COLOR.COLOR.key,
-        ]);
-
-        return new Buffer(statusLedCommand);
-    }
-
-    makePortCommandBuffer() {
-        let sendBody = null;
-        Object.keys(this.PORT_MAP).forEach((port) => {
-            let backBuffer;
-            let frontBuffer;
-            const portMap = this.PORT_MAP[port];
-            let brake = 0;
-            let checkPortMap = this.CHECK_PORT_MAP[port];
-            if (!checkPortMap || portMap.id !== checkPortMap.id) {
-                let portOut;
-                let power = Number(portMap.power);
-                if (portMap.type === this.motorMovementTypes.Power) {
-                    const time = Number(portMap.time) || 0;
-                    brake = 0;
-                    if (power > 100) {
-                        power = 100;
-                    } else if (power < -100) {
-                        power = -100;
-                    } else if (power === 0) {
-                        brake = 1;
-                    }
-
-                    if (time <= 0) {
-                        // infinity output port mode
-                        portOut = new Buffer([
-                            0xa4,
-                            0x81,
-                            0,
-                            0x81,
-                            this.outputPort[port],
-                            0x81,
-                            power,
-                            0xa6,
-                            0x81,
-                            0,
-                            0x81,
-                            this.outputPort[port],
-                        ]);
-                    } else {
-                        // time set mode 232, 3 === 1000ms
-                        frontBuffer = new Buffer([
-                            0xad,
-                            0x81,
-                            0,
-                            0x81,
-                            this.outputPort[port],
-                            0x81,
-                            power,
-                            0x83,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0x83,
-                        ]);
-                        backBuffer = new Buffer([
-                            0x83,
-                            0,
-                            0,
-                            0,
-                            0,
-                            0x81,
-                            brake,
-                        ]);
-                        const timeBuffer = new Buffer(4);
-                        timeBuffer.writeInt32LE(time);
-                        portOut = Buffer.concat([
-                            frontBuffer,
-                            timeBuffer,
-                            backBuffer,
-                        ]);
-                    }
-                } else {
-                    const degree = Number(portMap.degree) || 0;
-                    frontBuffer = new Buffer([
-                        0xac,
-                        0x81,
-                        0,
-                        0x81,
-                        this.outputPort[port],
-                        0x81,
-                        power,
-                        0x83,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0x83,
-                    ]);
-                    backBuffer = new Buffer([0x83, 0, 0, 0, 0, 0x81, brake]);
-                    const degreeBuffer = new Buffer(4);
-                    degreeBuffer.writeInt32LE(degree);
-                    portOut = Buffer.concat([
-                        frontBuffer,
-                        degreeBuffer,
-                        backBuffer,
-                    ]);
-                }
-
-                if (portOut) {
-                    if (!sendBody) {
-                        sendBody = new Buffer(portOut);
-                    } else {
-                        sendBody = Buffer.concat([sendBody, portOut]);
-                    }
-                }
-
-                this.CHECK_PORT_MAP[port] = this.PORT_MAP[port];
-            }
-        });
-        return sendBody;
     }
 
     /**
@@ -915,7 +598,7 @@ class rq_robot extends BaseModule {
             
             let setRQCMode = this.SetRQCControlMode();
             
-            sp.write(setRQCMode, () => {
+            this.sp.write(setRQCMode, () => {
                 this.sensorChecking();
             });
             
@@ -926,7 +609,9 @@ class rq_robot extends BaseModule {
         }
     }
     
-    reset() {}
+    reset() {
+        this.sp = null;
+    }
 }
 
 module.exports = new rq_robot();
