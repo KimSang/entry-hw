@@ -19,15 +19,65 @@ class rq_robot extends BaseModule {
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
 
-        this.motorMovementTypes = {
-            Degrees: 0,
-            Power: 1,
-        };
+        this.COMMAND_MAP = {
+            'rq_cmd_move_dc_motor' : 1,
+            'rq_cmd_set_dc_motor_position' : 2,
+            'rq_cmd_stop_dc_motor' : 3,
+            'rq_cmd_move_sam3_motor' : 4,
+            'rq_cmd_set_sam3_motor_position' : 5,
+            'rq_cmd_on_sam3_led' : 6,
+            'rq_cmd_off_sam3_led' : 7,
+            'rq_cmd_move_sam3_motor_manual' : 8,
+            'rq_cmd_get_sam3_motor_position' : 9,
+            'rq_cmd_sound_sensor' : 10,
+            'rq_cmd_infrared_ray_sensor' : 11,
+            'rq_cmd_touch_sensor' : 12,
+            'rq_cmd_play_sound' : 13,
+            'rq_cmd_play_sound_second' : 14,
+            'rq_cmd_stop_sound' : 15,
+            'rq_cmd_on_led' : 16,
+            'rq_cmd_off_led' : 17,
+            'rq_cmd_motion' : 18,
+        },
 
-        this.outputPort = {
-            READ: 1,
-            WRITE: 2,
-            READ_WRITE: 4,
+        this.PORT_MAP = {
+            A: {
+                cmd: this.COMMAND_MAP.rq_cmd_move_dc_motor,
+                motor : 0,
+                direction : 0,
+                speed : 0,
+            },
+            B: {
+                cmd : this.COMMAND_MAP.rq_cmd_set_dc_motor_position,
+                left_wheel : 0,
+                right_wheel : 0,
+            },
+            C: {
+                cmd : this.COMMAND_MAP.rq_cmd_stop_dc_motor,
+            },
+            D: {
+                cmd : this.COMMAND_MAP.rq_cmd_move_sam3_motor,
+                motor : 0,
+                direction : 0,
+                speed : 0,
+            },
+            E: {
+                cmd: this.COMMAND_MAP.rq_cmd_set_sam3_motor_position,
+                motor : 0,
+                position : 0,
+            },
+            F: {
+                type: this.COMMAND_MAP.rq_cmd_on_sam3_led,
+                motor : 0,
+            },
+            G: {
+                type: this.COMMAND_MAP.rq_cmd_move_sam3_motor_manual,
+                motor : 0,
+            },
+            H: {
+                type: this.COMMAND_MAP.rq_cmd_get_sam3_motor_position,
+                motor : 0,
+            },
         };
 
         this.isSensing = false;
@@ -509,71 +559,29 @@ class rq_robot extends BaseModule {
     }
 
     handleLocalData(data) {
-        // data: Native Buffer
-        if (data[0] === this.wholeResponseSize + 3 && data[1] === 0) {
-            const countKey = data.readInt16LE(2);
-            if (countKey in this.SENSOR_COUNTER_LIST) {
-                this.isSensing = false;
-                delete this.SENSOR_COUNTER_LIST[countKey];
-                data = data.slice(5); // 앞의 4 byte 는 size, counter 에 해당한다. 이 값은 할당 후 삭제한다.
-                let index = 0;
-
-                Object.keys(this.SENSOR_MAP).forEach((p) => {
-                    const port = Number(p) - 1;
-                    index = port * this.commandResponseSize;
-
-                    const type = data[index];
-                    const mode = data[index + 1];
-                    let siValue = Number(
-                        (data.readFloatLE(index + 2) || 0).toFixed(1)
-                    );
-                    this.returnData[p] = {
-                        type: type,
-                        mode: mode,
-                        siValue: siValue,
-                    };
-                });
-
-                index = 4 * this.commandResponseSize;
-                Object.keys(this.BUTTON_MAP).forEach((button) => {
-                    if (data[index] === 1) {
-                        console.log(button + ' button is pressed');
-                    }
-
-                    this.returnData[button] = {
-                        pressed: data[index++] === 1,
-                    };
-                });
-            }
-        }
+       
     }
 
     // Web Socket(엔트리)에 전달할 데이터
     requestRemoteData(handler) {
+/*
         Object.keys(this.returnData).forEach((key) => {
             if (this.returnData[key] !== undefined) {
                 handler.write(key, this.returnData[key]);
             }
         });
+  */
     }
 
-    // Web Socket 데이터 처리
     handleRemoteData(handler) {
-
-        for(var key in this.outputPort)
-        {
-            console.log(this.outputPort[key]);
-
-            let data = handler.read(this.outputPort[key]);
-            console.log(data);
-        }
-
-        console.log("handleRemoteData");
+        Object.keys(this.PORT_MAP).forEach((port) => {
+            this.PORT_MAP[port] = handler.read(port);
+            console.log(handler.read(port));
+        });
     }
 
     // 하드웨어에 전달할 데이터
     requestLocalData() {
-
         return null;
     }
 
