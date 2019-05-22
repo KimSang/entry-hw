@@ -479,6 +479,17 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
+    SetLed(ID, type)
+    {
+        let b = new Buffer(3);
+        
+        b[0] = 100;
+        b[1] = type;
+        b[2] = b[1];
+
+        return this.GetDirectCommand(7, ID, b, 1);
+    }
+
     DoMotion(MotionNo)
     {
         let b = new Buffer(3);
