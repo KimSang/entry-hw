@@ -15,7 +15,7 @@ class rq_robot extends BaseModule {
         this.com_port = null;
 
         this.sensors = [];
-        this.CHECK_PORT_MAP = {};
+        this.CHECK_MOTOR_MAP = {};
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
 
@@ -40,48 +40,106 @@ class rq_robot extends BaseModule {
             'rq_cmd_motion' : 18,
         },
 
-        this.PORT_MAP = {
+        this.MOTOR_MAP = {
             A: {
-                cmd: this.COMMAND_MAP.rq_cmd_move_dc_motor,
+                cmd: 0,
                 motor : 0,
                 direction : 0,
                 speed : 0,
             },
             B: {
-                cmd : this.COMMAND_MAP.rq_cmd_set_dc_motor_position,
+                cmd : 0,
                 left_wheel : 0,
                 right_wheel : 0,
             },
             C: {
-                cmd : this.COMMAND_MAP.rq_cmd_stop_dc_motor,
+                cmd : 0,
             },
             D: {
-                cmd : this.COMMAND_MAP.rq_cmd_move_sam3_motor,
+                cmd : 0,
                 motor : 0,
                 direction : 0,
                 speed : 0,
             },
             E: {
-                cmd: this.COMMAND_MAP.rq_cmd_set_sam3_motor_position,
+                cmd: 0,
                 motor : 0,
                 position : 0,
             },
             F: {
-                type: this.COMMAND_MAP.rq_cmd_on_sam3_led,
+                cmd: 0,
                 motor : 0,
             },
             G: {
-                type: this.COMMAND_MAP.rq_cmd_move_sam3_motor_manual,
+                cmd: 0,
                 motor : 0,
             },
             H: {
-                type: this.COMMAND_MAP.rq_cmd_get_sam3_motor_position,
+                cmd: 0,
                 motor : 0,
             },
         };
 
+        this.SENSOR_MAP = {
+            I: {
+                value : 0,
+            },
+            J: {
+                value : 0,
+            },
+            K1: {
+                cmd : 0,
+            },
+            K2: {
+                value : 0,
+            },
+            L1: {
+                value : 0,
+            },
+            L2: {
+                value : 0,
+            },
+        },
+
+        this.SOUND_MAP = {
+            M: {
+                cmd: 0,
+                play_list : null,
+            },
+            N: {
+                cmd: 0,
+                play_list : null,
+                sec : 0,
+            },
+            O: {
+                cmd : 0,
+            },
+        },
+
+        this.LED_MAP = {
+            P: {
+                cmd: 0,
+                led : 0,
+                color : 0,
+            },
+            Q: {
+                cmd : 0,
+                led : 0,
+            },
+        },
+        this.MOTION_MAP = {
+            R: {
+                cmd: 0,
+                motion : 0,
+            },
+        },
+        
         this.isSensing = false;
-        this.LAST_PORT_MAP = null;
+        this.LAST_MOTOR_MAP = null;
+        this.LAST_SENSOR_MAP = null;
+        this.LAST_SOUND_MAP = null;
+        this.LAST_LED_MAP = null;
+        this.LAST_MOTION_MAP = null;
     }
 
     MakeCommand(nCommand, bySize, contents)
@@ -559,29 +617,211 @@ class rq_robot extends BaseModule {
     }
 
     handleLocalData(data) {
-       
+       console.log("handleLocalData");
     }
 
     // Web Socket(엔트리)에 전달할 데이터
     requestRemoteData(handler) {
-/*
+
         Object.keys(this.returnData).forEach((key) => {
             if (this.returnData[key] !== undefined) {
                 handler.write(key, this.returnData[key]);
             }
         });
-  */
+  
     }
 
     handleRemoteData(handler) {
-        Object.keys(this.PORT_MAP).forEach((port) => {
-            this.PORT_MAP[port] = handler.read(port);
-            console.log(handler.read(port));
+        Object.keys(this.MOTOR_MAP).forEach((port) => {
+            this.MOTOR_MAP[port] = handler.read(port);
+        });
+        Object.keys(this.SENSOR_MAP).forEach((port) => {
+            this.SENSOR_MAP[port] = handler.read(port);
+        });
+        Object.keys(this.SOUND_MAP).forEach((port) => {
+            this.SOUND_MAP[port] = handler.read(port);
+        });
+        Object.keys(this.LED_MAP).forEach((port) => {
+            this.LED_MAP[port] = handler.read(port);
+        });
+        Object.keys(this.MOTION_MAP).forEach((port) => {
+            this.MOTION_MAP[port] = handler.read(port);
         });
     }
 
     // 하드웨어에 전달할 데이터
     requestLocalData() {
+
+        let isSendData = false;
+        let sendBody;
+        let skipOutput = false;
+
+        if(this.LAST_MOTOR_MAP) {
+            const arr = Object.keys(this.MOTOR_MAP).filter((port) => {
+                const map1 = this.MOTOR_MAP[port];
+                const map2 = this.LAST_MOTOR_MAP[port];
+                let ret = 0;
+
+                switch(port)
+                {
+                    case 'A':
+                        ret = !(map1.cmd === map2.cmd && 
+                                map1.motor === map2.motor && 
+                                map1.direction === map2.direction && 
+                                map1.speed === map2.speed);
+                        break;
+                    case 'B':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.left_wheel === map2.left_wheel && 
+                            map1.right_wheel === map2.right_wheel);
+                        break;
+                    case 'C':
+                        ret = !(map1.cmd === map2.cmd);
+                        break;
+                    case 'D':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor && 
+                            map1.direction === map2.direction && 
+                            map1.speed === map2.speed);
+                        break;
+                    case 'E':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor && 
+                            map1.position === map2.position);
+                        break;
+                    case 'F':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor);
+                        break;
+                    case 'G':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor);
+                        break;
+                    case 'H':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor );
+                        break;
+                    default:
+                        ret = false;
+                }
+
+                return ret;
+            });
+
+            skipOutput = arr.length === 0;
+        }
+
+        if(!skipOutput){
+            isSendData = true;
+            this.LAST_MOTOR_MAP = _.cloneDeep(this.MOTOR_MAP);
+            Object.keys(this.MOTOR_MAP).forEach((port) => {
+                console.log(this.MOTOR_MAP[port]);
+            });
+        }
+
+        if(this.LAST_SOUND_MAP) {
+            const arr = Object.keys(this.SOUND_MAP).filter((port) => {
+                const map1 = this.SOUND_MAP[port];
+                const map2 = this.LAST_SOUND_MAP[port];
+                let ret = 0;
+
+                switch(port)
+                {
+                    case 'M':
+                        ret = !(map1.cmd === map2.cmd && 
+                                map1.play_list === map2.play_list);
+                        break;
+                    case 'N':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.play_list === map2.play_list && 
+                            map1.sec === map2.sec);
+                        break;
+                    case 'O':
+                        ret = !(map1.cmd === map2.cmd);
+                        break;
+                    default:
+                        ret = false;
+                }
+
+                return ret;
+            });
+
+            skipOutput = arr.length === 0;
+        }
+
+        if(!skipOutput){
+            isSendData = true;
+            this.LAST_SOUND_MAP = _.cloneDeep(this.LAST_SOUND_MAP);
+            Object.keys(this.SOUND_MAP).forEach((port) => {
+                console.log(this.SOUND_MAP[port]);
+            });
+        }
+
+        if(this.LAST_LED_MAP) {
+            const arr = Object.keys(this.LED_MAP).filter((port) => {
+                const map1 = this.LED_MAP[port];
+                const map2 = this.LAST_LED_MAP[port];
+                let ret = 0;
+
+                switch(port)
+                {
+                    case 'P':
+                        ret = !(map1.cmd === map2.cmd && 
+                                map1.led === map2.led && 
+                                map1.color === map2.color);
+                        break;
+                    case 'Q':
+                        ret = !(map1.cmd === map2.cmd && 
+                            map1.led === map2.led);
+                        break;
+                    default:
+                        ret = false;
+                }
+
+                return ret;
+            });
+
+            skipOutput = arr.length === 0;
+        }
+
+        if(!skipOutput){
+            isSendData = true;
+            this.LAST_LED_MAP = _.cloneDeep(this.LED_MAP);
+            Object.keys(this.LED_MAP).forEach((port) => {
+                console.log(this.LED_MAP[port]);
+            });
+        }
+
+        if(this.LAST_MOTION_MAP) {
+            const arr = Object.keys(this.MOTION_MAP).filter((port) => {
+                const map1 = this.MOTION_MAP[port];
+                const map2 = this.LAST_MOTION_MAP[port];
+                let ret = 0;
+
+                switch(port)
+                {
+                    case 'R':
+                        ret = !(map1.cmd === map2.cmd && 
+                                map1.motion === map2.motion);
+                        break;
+                    default:
+                        ret = false;
+                }
+
+                return ret;
+            });
+
+            skipOutput = arr.length === 0;
+        }
+
+        if(!skipOutput){
+            isSendData = true;
+            this.LAST_MOTION_MAP = _.cloneDeep(this.MOTION_MAP);
+            Object.keys(this.MOTION_MAP).forEach((port) => {
+                console.log(this.MOTION_MAP[port]);
+            });
+        }
+
         return null;
     }
 
