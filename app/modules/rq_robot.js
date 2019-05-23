@@ -15,7 +15,11 @@ class rq_robot extends BaseModule {
         this.com_port = null;
 
         this.sensors = [];
-        this.CHECK_MOTOR_MAP = {};
+        this.CHECK_DC_MOTOR_MAP = {};
+        this.CHECK_SAM3_MOTOR_MAP = {};
+        this.CHECK_SOUND_MAP = {};
+        this.CHECK_LED_MAP = {};
+        this.CHECK_MOTION_MAP = {};
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
 
@@ -40,7 +44,7 @@ class rq_robot extends BaseModule {
             'rq_cmd_motion' : 18,
         },
 
-        this.MOTOR_MAP = {
+        this.DC_MOTOR_MAP = {
             A: {
                 cmd: 0,
                 motor : 0,
@@ -55,6 +59,9 @@ class rq_robot extends BaseModule {
             C: {
                 cmd : 0,
             },
+        };
+        
+        this.SAM3_MOTOR_MAP = {
             D: {
                 cmd : 0,
                 motor : 0,
@@ -78,7 +85,7 @@ class rq_robot extends BaseModule {
                 cmd: 0,
                 motor : 0,
             },
-        };
+        }
 
         this.SENSOR_MAP = {
             I: {
@@ -135,11 +142,12 @@ class rq_robot extends BaseModule {
         },
         
         this.isSensing = false;
-        this.LAST_MOTOR_MAP = null;
+        this.LAST_DC_MOTOR_MAP = null;
         this.LAST_SENSOR_MAP = null;
         this.LAST_SOUND_MAP = null;
         this.LAST_LED_MAP = null;
         this.LAST_MOTION_MAP = null;
+        this.LAST_SAM3_MOTOR_MAP = null;
     }
 
     MakeCommand(nCommand, bySize, contents)
@@ -508,7 +516,7 @@ class rq_robot extends BaseModule {
         //FF E0 DD 00 01 3C
         //FF E0 DD 00 00 3D
 
-        let b = new buffer(3);
+        let b = new Buffer(3);
         b[0] = 221;
         b[1] = 0;
         b[2] = SoundNo;
@@ -589,37 +597,31 @@ class rq_robot extends BaseModule {
 
         if (!this.isSendInitData) {
             
-            const initCmd = new Buffer([0xff, 0xe0, 0xfb, 0x01, 0x0, 0x1a]);
+            const initCmd = new Buffer([0xff, 0xe0, 0xfb, 0x01,
+                                        0x0, 0x1a]);
             
-            sp.write(initCmd, () => {
-                this.sensorChecking();
-            });
+            sp.write(initCmd);
             
-            const initBuf = new Buffer([0xff, 0xff, 0xaa, 0x55, 0xaa, 0x55, 0x37, 0xba, 0x12, 0x1, 0x0, 0x0, 0x0, 0x1, 0x1, 0x1]);
+            const initBuf = new Buffer([0xff, 0xff, 0xaa, 0x55, 
+                                        0xaa, 0x55, 0x37, 0xba, 
+                                        0x12, 0x1, 0x0, 0x0, 0x0, 
+                                        0x1, 0x1, 0x1]);
 
-            sp.write(initBuf, () => {
-                this.sensorChecking();
-            });
+            sp.write(initBuf);
 
             let setRQCMode = this.SetRQCControlMode();
             
-            sp.write(setRQCMode, () => {
-                this.sensorChecking();
-            });
+            sp.write(setRQCMode);
 
             let getError = this.GetErrorCode(1);
 
-            sp.write(getError, () => {
-                this.sensorChecking();
-            });
+            sp.write(getError);
 
             let setDirectMode = this.SetDirectControlMode();
 
-            sp.write(setDirectMode, () => {
-                this.sensorChecking();
-            });
-            
+            sp.write(setDirectMode);
         }
+
         return null;
     }
 
@@ -628,12 +630,11 @@ class rq_robot extends BaseModule {
     }
 
     handleLocalData(data) {
-       console.log("handleLocalData");
+        console.log(data);
     }
 
     // Web Socket(엔트리)에 전달할 데이터
     requestRemoteData(handler) {
-
         Object.keys(this.returnData).forEach((key) => {
             if (this.returnData[key] !== undefined) {
                 handler.write(key, this.returnData[key]);
@@ -643,8 +644,11 @@ class rq_robot extends BaseModule {
     }
 
     handleRemoteData(handler) {
-        Object.keys(this.MOTOR_MAP).forEach((port) => {
-            this.MOTOR_MAP[port] = handler.read(port);
+        Object.keys(this.DC_MOTOR_MAP).forEach((port) => {
+            this.DC_MOTOR_MAP[port] = handler.read(port);
+        });
+        Object.keys(this.SAM3_MOTOR_MAP).forEach((port) => {
+            this.SAM3_MOTOR_MAP[port] = handler.read(port);
         });
         Object.keys(this.SENSOR_MAP).forEach((port) => {
             this.SENSOR_MAP[port] = handler.read(port);
@@ -663,32 +667,89 @@ class rq_robot extends BaseModule {
     // 하드웨어에 전달할 데이터
     requestLocalData() {
 
-        let isSendData = false;
-        let sendBody;
-        let skipOutput = false;
-
-        if(this.LAST_MOTOR_MAP) {
-            const arr = Object.keys(this.MOTOR_MAP).filter((port) => {
-                const map1 = this.MOTOR_MAP[port];
-                const map2 = this.LAST_MOTOR_MAP[port];
+        let skipOutput_dc_motor = false;
+        let skipOutput_sam3_motor = false;
+        let skipOutput_sound = false;
+        let skipOutput_led = false;
+        let skipOutput_motion = false;
+        
+        if(this.LAST_DC_MOTOR_MAP) {
+            const arr = Object.keys(this.DC_MOTOR_MAP).filter((port) => {
+                const map1 = this.DC_MOTOR_MAP[port];
+                const map2 = this.LAST_DC_MOTOR_MAP[port];
                 let ret = 0;
 
                 switch(port)
                 {
                     case 'A':
-                        ret = !(map1.cmd === map2.cmd && 
-                                map1.motor === map2.motor && 
-                                map1.direction === map2.direction && 
-                                map1.speed === map2.speed);
+                        if(!(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor && 
+                            map1.direction === map2.direction && 
+                            map1.speed === map2.speed))
+                        {
+                            ret = true;
+
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_move_dc_motor)
+                            {
+                                let buf = this.RotateMotor(Number(map1.motor), Number(map1.direction), Number(map1.speed));
+                                this.sp.write(buf);
+                            }
+                        }
                         break;
                     case 'B':
-                        ret = !(map1.cmd === map2.cmd && 
+                        if(!(map1.cmd === map2.cmd && 
                             map1.left_wheel === map2.left_wheel && 
-                            map1.right_wheel === map2.right_wheel);
+                            map1.right_wheel === map2.right_wheel))
+                            {
+                                if(map1.cmd == this.COMMAND_MAP.rq_cmd_set_dc_motor_position)
+                                {
+                                    let left_wheel = Number(map1.left_wheel);
+                                    let right_wheel = Number(map1.right_wheel);
+                                    let left_direction = left_wheel > 0 ? 3:4;
+                                    let right_direction = right_wheel > 0 ? 4:3;
+
+                                    let left_buf = this.RotateMotor(29, left_direction, Math.abs(left_wheel));
+                                    this.sp.write(left_buf);
+                                    let right_buf = this.RotateMotor(30, right_direction, Math.abs(right_wheel));
+                                    this.sp.write(right_buf);
+                                }
+                                
+                                ret = true;
+                            }
                         break;
                     case 'C':
-                        ret = !(map1.cmd === map2.cmd);
+                        if(!(map1.cmd === map2.cmd))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_dc_motor)
+                            {
+                                let buf = this.BreakMode();
+                                this.sp.write(buf);
+                            }
+                            ret = true;
+                        }
                         break;
+                    default:
+                        ret = false;
+                }
+
+                return ret;
+            });
+
+            skipOutput_dc_motor = arr.length === 0;
+        }
+
+        if(!skipOutput_dc_motor){
+            this.LAST_DC_MOTOR_MAP = _.cloneDeep(this.DC_MOTOR_MAP);
+        }
+
+        if(this.LAST_SAM3_MOTOR_MAP) {
+            const arr = Object.keys(this.SAM3_MOTOR_MAP).filter((port) => {
+                const map1 = this.SAM3_MOTOR_MAP[port];
+                const map2 = this.LAST_SAM3_MOTOR_MAP[port];
+                let ret = 0;
+
+                switch(port)
+                {
                     case 'D':
                         ret = !(map1.cmd === map2.cmd && 
                             map1.motor === map2.motor && 
@@ -719,15 +780,11 @@ class rq_robot extends BaseModule {
                 return ret;
             });
 
-            skipOutput = arr.length === 0;
+            skipOutput_sam3_motor = arr.length === 0;
         }
 
-        if(!skipOutput){
-            isSendData = true;
-            this.LAST_MOTOR_MAP = _.cloneDeep(this.MOTOR_MAP);
-            Object.keys(this.MOTOR_MAP).forEach((port) => {
-                console.log(this.MOTOR_MAP[port]);
-            });
+        if(!skipOutput_sam3_motor){
+            this.LAST_SAM3_MOTOR_MAP = _.cloneDeep(this.SAM3_MOTOR_MAP);
         }
 
         if(this.LAST_SOUND_MAP) {
@@ -739,16 +796,42 @@ class rq_robot extends BaseModule {
                 switch(port)
                 {
                     case 'M':
-                        ret = !(map1.cmd === map2.cmd && 
-                                map1.play_list === map2.play_list);
+                        if(!(map1.cmd === map2.cmd && map1.play_list === map2.play_list))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_play_sound)
+                            {
+                                let buf = this.PlaySound(Number(map1.play_list));
+                                this.sp.write(buf);
+                            }
+                            ret = true;
+                        }
                         break;
                     case 'N':
-                        ret = !(map1.cmd === map2.cmd && 
+                        if(!(map1.cmd === map2.cmd && 
                             map1.play_list === map2.play_list && 
-                            map1.sec === map2.sec);
+                            map1.sec === map2.sec))
+                        {
+                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_play_sound_second)
+                            {
+                                let buf = this.PlaySound(Number(map1.play_list));
+                                this.sp.write(buf);
+                                //Sleep(Number(map1.sec))
+                                let stop_buf = this.PlaySound(0);
+                                this.sp.write(stop_buf);
+                            }
+                            ret = true;
+                        }
                         break;
                     case 'O':
-                        ret = !(map1.cmd === map2.cmd);
+                        if(!(map1.cmd === map2.cmd))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound)
+                            {
+                                let buf = this.PlaySound(0);
+                                this.sp.write(buf);
+                            }
+                            ret = true;
+                        }
                         break;
                     default:
                         ret = false;
@@ -757,15 +840,11 @@ class rq_robot extends BaseModule {
                 return ret;
             });
 
-            skipOutput = arr.length === 0;
+            skipOutput_sound = arr.length === 0;
         }
 
-        if(!skipOutput){
-            isSendData = true;
-            this.LAST_SOUND_MAP = _.cloneDeep(this.LAST_SOUND_MAP);
-            Object.keys(this.SOUND_MAP).forEach((port) => {
-                console.log(this.SOUND_MAP[port]);
-            });
+        if(!skipOutput_sound){
+            this.LAST_SOUND_MAP = _.cloneDeep(this.SOUND_MAP);
         }
 
         if(this.LAST_LED_MAP) {
@@ -777,30 +856,40 @@ class rq_robot extends BaseModule {
                 switch(port)
                 {
                     case 'P':
-                        ret = !(map1.cmd === map2.cmd && 
+                        if(!(map1.cmd === map2.cmd && 
                                 map1.led === map2.led && 
-                                map1.color === map2.color);
+                                map1.color === map2.color))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_on_led)
+                            {
+                                let buf = this.SetLed(Number(map1.led), Number(map1.color));
+                                this.sp.write(buf);
+                            }
+                            ret = true;
+                        }
                         break;
                     case 'Q':
-                        ret = !(map1.cmd === map2.cmd && 
-                            map1.led === map2.led);
+                        if(!(map1.cmd === map2.cmd && map1.led === map2.led))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_off_led)
+                            {
+                                let buf = this.SetLed(Number(map1.led), 0);
+                                this.sp.write(buf);
+                            }
+                            ret = true;
+                        }
                         break;
                     default:
                         ret = false;
                 }
-
                 return ret;
             });
 
-            skipOutput = arr.length === 0;
+            skipOutput_led = arr.length === 0;
         }
 
-        if(!skipOutput){
-            isSendData = true;
+        if(!skipOutput_led){
             this.LAST_LED_MAP = _.cloneDeep(this.LED_MAP);
-            Object.keys(this.LED_MAP).forEach((port) => {
-                console.log(this.LED_MAP[port]);
-            });
         }
 
         if(this.LAST_MOTION_MAP) {
@@ -812,8 +901,14 @@ class rq_robot extends BaseModule {
                 switch(port)
                 {
                     case 'R':
-                        ret = !(map1.cmd === map2.cmd && 
-                                map1.motion === map2.motion);
+                        if(!(map1.cmd === map2.cmd && map1.motion === map2.motion))
+                        {
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_motion)
+                            {
+                                let buf = this.DoMotion(Number(map1.motion));
+                                this.sp.write(buf);
+                            }
+                        }
                         break;
                     default:
                         ret = false;
@@ -822,15 +917,11 @@ class rq_robot extends BaseModule {
                 return ret;
             });
 
-            skipOutput = arr.length === 0;
+            skipOutput_motion = arr.length === 0;
         }
 
-        if(!skipOutput){
-            isSendData = true;
+        if(!skipOutput_motion){
             this.LAST_MOTION_MAP = _.cloneDeep(this.MOTION_MAP);
-            Object.keys(this.MOTION_MAP).forEach((port) => {
-                console.log(this.MOTION_MAP[port]);
-            });
         }
 
         return null;
