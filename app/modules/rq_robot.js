@@ -8,7 +8,6 @@ class rq_robot extends BaseModule {
         this.isSendInitData = false;
         this.isSensorCheck = false;
         this.isConnect = false;
-
         this.sp = null;
         this.handler = null;
         this.config = null;
@@ -122,6 +121,7 @@ class rq_robot extends BaseModule {
             },
             O: {
                 cmd : 0,
+                stop : 0,
             },
         },
 
@@ -598,30 +598,16 @@ class rq_robot extends BaseModule {
         }
 
         if (!this.isSendInitData) {
-            
-            const initCmd = new Buffer([0xff, 0xe0, 0xfb, 0x01,
-                                        0x0, 0x1a]);
-            
-            sp.write(initCmd);
-            
-            const initBuf = new Buffer([0xff, 0xff, 0xaa, 0x55, 
-                                        0xaa, 0x55, 0x37, 0xba, 
-                                        0x12, 0x1, 0x0, 0x0, 0x0, 
-                                        0x1, 0x1, 0x1]);
-
-            sp.write(initBuf);
 
             let setRQCMode = this.SetRQCControlMode();
             
             sp.write(setRQCMode);
 
-            let getError = this.GetErrorCode(1);
-
-            sp.write(getError);
-
             let setDirectMode = this.SetDirectControlMode();
 
-            sp.write(setDirectMode);
+            sp.write(setDirectMode, () => {
+                this.sensorChecking();
+            });
         }
 
         return null;
@@ -632,7 +618,44 @@ class rq_robot extends BaseModule {
     }
 
     handleLocalData(data) {
-        console.log(data);
+        /*
+        if (data[0] === this.wholeResponseSize + 3 && data[1] === 0) {
+            const countKey = data.readInt16LE(2);
+            if (countKey in this.SENSOR_COUNTER_LIST) {
+                this.isSensing = false;
+                delete this.SENSOR_COUNTER_LIST[countKey];
+                data = data.slice(5); // 앞의 4 byte 는 size, counter 에 해당한다. 이 값은 할당 후 삭제한다.
+                let index = 0;
+
+                Object.keys(this.SENSOR_MAP).forEach((p) => {
+                    const port = Number(p) - 1;
+                    index = port * this.commandResponseSize;
+
+                    const type = data[index];
+                    const mode = data[index + 1];
+                    let siValue = Number(
+                        (data.readFloatLE(index + 2) || 0).toFixed(1)
+                    );
+                    this.returnData[p] = {
+                        type: type,
+                        mode: mode,
+                        siValue: siValue,
+                    };
+                });
+
+                index = 4 * this.commandResponseSize;
+                Object.keys(this.BUTTON_MAP).forEach((button) => {
+                    if (data[index] === 1) {
+                        console.log(button + ' button is pressed');
+                    }
+
+                    this.returnData[button] = {
+                        pressed: data[index++] === 1,
+                    };
+                });
+            }
+        }
+        */
     }
 
     // Web Socket(엔트리)에 전달할 데이터
@@ -855,10 +878,9 @@ class rq_robot extends BaseModule {
                             if( map1.cmd == this.COMMAND_MAP.rq_cmd_play_sound_second)
                             {
                                 let buf = this.PlaySound(Number(map1.play_list));
-                                this.sp.write(buf);
-                                //Sleep(Number(map1.sec))
                                 let stop_buf = this.PlaySound(0);
-                                this.sp.write(stop_buf);
+
+                                this.sp.write(buf);
                             }
                             ret = true;
                         }
@@ -866,10 +888,11 @@ class rq_robot extends BaseModule {
                     case 'O':
                         if(!(map1.cmd === map2.cmd))
                         {
-                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound)
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && map1.stop == 1)
                             {
                                 let buf = this.PlaySound(0);
                                 this.sp.write(buf);
+                                map1.stop = 0;
                             }
                             ret = true;
                         }
@@ -976,7 +999,75 @@ class rq_robot extends BaseModule {
      * 보내는 데이터는 여러개의 데이터 명령이고 받는 결과 또한 여러개의 결과값이다.
      */
     sensorCheck() {
-       
+        /*
+        if (!this.isSensing) {
+            this.isSensing = true;
+            const initBuf = this.makeInitBuffer(
+                [0],
+                [this.wholeResponseSize, 0]
+            );
+            const counter = initBuf.readInt16LE(2); // initBuf의 index(2) 부터 2byte 는 counter 에 해당
+            this.SENSOR_COUNTER_LIST[counter] = true;
+            let sensorBody = [];
+            let index = 0;
+            Object.keys(this.SENSOR_MAP).forEach((p) => {
+                let mode = 0;
+                if (this.returnData[p] && this.returnData[p]['type']) {
+                    mode = this.SENSOR_MAP[p]['mode'] || 0;
+                }
+                const port = Number(p) - 1;
+                index = port * this.commandResponseSize;
+                const modeSet = new Buffer([
+                    0x99,
+                    0x05,
+                    0,
+                    port,
+                    0xe1,
+                    index,
+                    0xe1,
+                    index + 1,
+                ]);
+                const readySi = new Buffer([
+                    0x99,
+                    0x1d,
+                    0,
+                    port,
+                    0,
+                    mode,
+                    1,
+                    0xe1,
+                    index + 2,
+                ]);
+
+                if (!sensorBody.length) {
+                    sensorBody = Buffer.concat([modeSet, readySi]);
+                } else {
+                    sensorBody = Buffer.concat([sensorBody, modeSet, readySi]);
+                }
+            });
+
+            let offsetAfterPortResponse = 4 * this.commandResponseSize; // 포트는 [0~3] 까지다.
+            Object.keys(this.BUTTON_MAP).forEach((button) => {
+                const buttonPressedCommand = new Buffer([
+                    0x83, // opUI_BUTTON
+                    0x09, // pressed
+                    this.BUTTON_MAP[button].key,
+                    0xe1,
+                    offsetAfterPortResponse++,
+                ]);
+
+                sensorBody = Buffer.concat([sensorBody, buttonPressedCommand]);
+            });
+
+            const totalLength = initBuf.length + sensorBody.length;
+            const sendBuffer = Buffer.concat(
+                [initBuf, sensorBody],
+                totalLength
+            );
+            this.checkByteSize(sendBuffer);
+            this.sp.write(sendBuffer);
+        }
+        */
     }
 
     connect() {}
@@ -986,16 +1077,29 @@ class rq_robot extends BaseModule {
             clearInterval(this.sensing);
 
             this.isConnect = false;
+            this.isSendInitData = false;
+            this.isSensorCheck = false;
             
             let setRQCMode = this.SetRQCControlMode();
             
-            this.sp.write(setRQCMode, () => {
-                this.sensorChecking();
-            });
-            
-            connect.close();
-            if (this.sp) {
-                delete self.sp;
+            if(this.sp)
+            {
+                this.sp.write(setRQCMode, 
+                    (err) => {
+                    this.sp = null;
+                    if(err)
+                    {
+                        console.log(err);
+                    }            
+                });
+                
+                connect.close();
+                if (this.sp) {
+                    delete self.sp;
+                }
+            }
+            else{
+                connect.close();
             }
         }
     }
