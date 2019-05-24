@@ -24,24 +24,25 @@ class rq_robot extends BaseModule {
         this.returnData = {};
 
         this.COMMAND_MAP = {
-            'rq_cmd_move_dc_motor' : 1,
-            'rq_cmd_set_dc_motor_position' : 2,
-            'rq_cmd_stop_dc_motor' : 3,
-            'rq_cmd_move_sam3_motor' : 4,
-            'rq_cmd_set_sam3_motor_position' : 5,
-            'rq_cmd_on_sam3_led' : 6,
-            'rq_cmd_off_sam3_led' : 7,
-            'rq_cmd_move_sam3_motor_manual' : 8,
-            'rq_cmd_get_sam3_motor_position' : 9,
-            'rq_cmd_sound_sensor' : 10,
-            'rq_cmd_infrared_ray_sensor' : 11,
-            'rq_cmd_touch_sensor' : 12,
-            'rq_cmd_play_sound' : 13,
-            'rq_cmd_play_sound_second' : 14,
-            'rq_cmd_stop_sound' : 15,
-            'rq_cmd_on_led' : 16,
-            'rq_cmd_off_led' : 17,
-            'rq_cmd_motion' : 18,
+                'rq_cmd_move_dc_motor' : 1,
+                'rq_cmd_set_dc_motor_position' : 2,
+                'rq_cmd_stop_dc_motor' : 3,
+                'rq_cmd_move_sam3_motor' : 4,
+                'rq_cmd_set_sam3_motor_position' : 5,
+                'rq_cmd_on_sam3_led' : 6,
+                'rq_cmd_off_sam3_led' : 7,
+                'rq_cmd_move_sam3_motor_manual' : 8,
+                'rq_cmd_get_sam3_motor_position' : 9,
+                'rq_cmd_sound_sensor' : 10,
+                'rq_cmd_remote_control' : 11,
+                'rq_cmd_infrared_ray_sensor' : 12,
+                'rq_cmd_touch_sensor' : 13,
+                'rq_cmd_play_sound' : 14,
+                'rq_cmd_play_sound_second' : 15,
+                'rq_cmd_stop_sound' : 16,
+                'rq_cmd_on_led' : 17,
+                'rq_cmd_off_led' : 18,
+                'rq_cmd_motion' : 19,
         },
 
         this.DC_MOTOR_MAP = {
@@ -58,6 +59,7 @@ class rq_robot extends BaseModule {
             },
             C: {
                 cmd : 0,
+                stop : 0,
             },
         };
         
@@ -678,7 +680,7 @@ class rq_robot extends BaseModule {
                 const map1 = this.DC_MOTOR_MAP[port];
                 const map2 = this.LAST_DC_MOTOR_MAP[port];
                 let ret = 0;
-
+                
                 switch(port)
                 {
                     case 'A':
@@ -718,12 +720,13 @@ class rq_robot extends BaseModule {
                             }
                         break;
                     case 'C':
-                        if(!(map1.cmd === map2.cmd))
+                        if(!(map1.cmd === map2.cmd && map1.stop === map2.stop))
                         {
-                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_dc_motor)
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_dc_motor && map1.stop == 1)
                             {
                                 let buf = this.BreakMode();
                                 this.sp.write(buf);
+                                map1.stop = 0;
                             }
                             ret = true;
                         }
@@ -751,27 +754,65 @@ class rq_robot extends BaseModule {
                 switch(port)
                 {
                     case 'D':
-                        ret = !(map1.cmd === map2.cmd && 
+                        if(!(map1.cmd === map2.cmd && 
                             map1.motor === map2.motor && 
                             map1.direction === map2.direction && 
-                            map1.speed === map2.speed);
+                            map1.speed === map2.speed))
+                        {
+                            ret = true;
+
+                        }
                         break;
                     case 'E':
-                        ret = !(map1.cmd === map2.cmd && 
+                        if(!(map1.cmd === map2.cmd && 
                             map1.motor === map2.motor && 
-                            map1.position === map2.position);
+                            map1.position === map2.position))
+                        {
+                            ret = true;
+
+                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_move_sam3_motor)
+                            {
+                                let buf = this.SetServoPosion(Number(map1.motor), Number(map1.position), 2);
+                                this.sp.write(buf);
+                            }
+                        }
                         break;
                     case 'F':
-                        ret = !(map1.cmd === map2.cmd && 
-                            map1.motor === map2.motor);
+                        if(!(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor))
+                        {
+                            ret = true;  
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_on_sam3_led)
+                            {
+                                let buf = this.SetServoLed(Number(map1.motor), true);
+                                this.sp.write(buf);
+                            } 
+                            else if(map1.cmd == this.COMMAND_MAP.rq_cmd_off_sam3_led)
+                            {
+                                let buf = this.SetServoLed(Number(map1.motor), false);
+                                this.sp.write(buf);
+                            }
+                        }
                         break;
                     case 'G':
-                        ret = !(map1.cmd === map2.cmd && 
-                            map1.motor === map2.motor);
+                        if(!(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor))
+                        {
+                            ret = true;   
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_move_sam3_motor_manual)
+                            {
+                                let buf = this.PassiveMode(Number(map1.motor));
+                                this.sp.write(buf);
+                            }
+                        }
                         break;
                     case 'H':
-                        ret = !(map1.cmd === map2.cmd && 
-                            map1.motor === map2.motor );
+                        if(!(map1.cmd === map2.cmd && 
+                            map1.motor === map2.motor ))
+                        {
+                            ret = true;
+
+                        }
                         break;
                     default:
                         ret = false;
