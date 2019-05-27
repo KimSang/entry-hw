@@ -22,6 +22,15 @@ class rq_robot extends BaseModule {
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
 
+        this.deviceTypes = {
+            RQ_Touch_1: 1,
+            RQ_Touch_2: 2,
+            RQ_Remote: 3,
+            RQ_Sound: 4,
+            RQ_Inf_1: 5,
+            RQ_Inf_2: 6,
+        };
+
         this.COMMAND_MAP = {
                 'rq_cmd_move_dc_motor' : 1,
                 'rq_cmd_set_dc_motor_position' : 2,
@@ -90,22 +99,28 @@ class rq_robot extends BaseModule {
 
         this.SENSOR_MAP = {
             I: {
-                value : 0,
+                type : this.deviceTypes.RQ_Touch_1,
+                mode : 0,
             },
             J: {
-                value : 0,
+                type : this.deviceTypes.RQ_Touch_2,
+                mode : 0,
             },
             K1: {
-                cmd : 0,
+                type : this.deviceTypes.RQ_Remote,
+                mode : 0,
             },
             K2: {
-                value : 0,
+                type : this.deviceTypes.RQ_Sound,
+                mode : 0,
             },
             L1: {
-                value : 0,
+                type : this.deviceTypes.RQ_Inf_1,
+                mode : 0,
             },
             L2: {
-                value : 0,
+                type : this.deviceTypes.RQ_Inf_2,
+                mode : 0,
             },
         },
 
@@ -559,9 +574,11 @@ class rq_robot extends BaseModule {
      * 센서를 200ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
      */
     sensorChecking() {
+        console.log("sensor");
         if (!this.isSensorCheck) {
             this.sensing = setInterval(() => {
                 this.sensorCheck();
+                console.log("sensorChecking");
                 this.isSensing = false;
             }, 200);
             this.isSensorCheck = true;
@@ -618,6 +635,8 @@ class rq_robot extends BaseModule {
     }
 
     handleLocalData(data) {
+        console.log(data);
+        this.isSensing = false;
         /*
         if (data[0] === this.wholeResponseSize + 3 && data[1] === 0) {
             const countKey = data.readInt16LE(2);
@@ -784,6 +803,13 @@ class rq_robot extends BaseModule {
                         {
                             ret = true;
 
+                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_move_sam3_motor)
+                            {
+                                let buf = this.RotateMotor(Number(map1.motor), Number(map1.direction), Number(map1.speed));
+                                console.log(buf);
+                                this.sp.write(buf);
+                            }
+
                         }
                         break;
                     case 'E':
@@ -793,7 +819,7 @@ class rq_robot extends BaseModule {
                         {
                             ret = true;
 
-                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_move_sam3_motor)
+                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_set_sam3_motor_position)
                             {
                                 let buf = this.SetServoPosion(Number(map1.motor), Number(map1.position), 2);
                                 this.sp.write(buf);
@@ -834,6 +860,11 @@ class rq_robot extends BaseModule {
                             map1.motor === map2.motor ))
                         {
                             ret = true;
+                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_get_sam3_motor_position)
+                            {
+                                let buf = this.GetServoPosition(Number(map1.motor));
+                                this.sp.write(buf);
+                            }
 
                         }
                         break;
@@ -1002,70 +1033,34 @@ class rq_robot extends BaseModule {
         /*
         if (!this.isSensing) {
             this.isSensing = true;
-            const initBuf = this.makeInitBuffer(
-                [0],
-                [this.wholeResponseSize, 0]
-            );
-            const counter = initBuf.readInt16LE(2); // initBuf의 index(2) 부터 2byte 는 counter 에 해당
-            this.SENSOR_COUNTER_LIST[counter] = true;
-            let sensorBody = [];
+
             let index = 0;
             Object.keys(this.SENSOR_MAP).forEach((p) => {
                 let mode = 0;
                 if (this.returnData[p] && this.returnData[p]['type']) {
                     mode = this.SENSOR_MAP[p]['mode'] || 0;
                 }
-                const port = Number(p) - 1;
-                index = port * this.commandResponseSize;
-                const modeSet = new Buffer([
-                    0x99,
-                    0x05,
-                    0,
-                    port,
-                    0xe1,
-                    index,
-                    0xe1,
-                    index + 1,
-                ]);
-                const readySi = new Buffer([
-                    0x99,
-                    0x1d,
-                    0,
-                    port,
-                    0,
-                    mode,
-                    1,
-                    0xe1,
-                    index + 2,
-                ]);
-
-                if (!sensorBody.length) {
-                    sensorBody = Buffer.concat([modeSet, readySi]);
-                } else {
-                    sensorBody = Buffer.concat([sensorBody, modeSet, readySi]);
+                switch(p.type)
+                {
+                    case this.deviceTypes.RQ_Touch_1:
+                        var buf = this.GetTouchIR(0);
+                        this.sp.write(buf);
+                        break;
+                    case this.deviceTypes.RQ_Touch_2:
+                        var buf = this.GetTouchIR(2);
+                        this.sp.write(buf);
+                        break;
+                    case this.deviceTypes.RQ_Inf_1:
+                        break;
+                    case this.deviceTypes.RQ_Inf_2:
+                        break;
+                    case this.deviceTypes.RQ_Remote:
+                        break;
+                    case this.deviceTypes.RQ_Sound:
+                        break;
                 }
             });
 
-            let offsetAfterPortResponse = 4 * this.commandResponseSize; // 포트는 [0~3] 까지다.
-            Object.keys(this.BUTTON_MAP).forEach((button) => {
-                const buttonPressedCommand = new Buffer([
-                    0x83, // opUI_BUTTON
-                    0x09, // pressed
-                    this.BUTTON_MAP[button].key,
-                    0xe1,
-                    offsetAfterPortResponse++,
-                ]);
-
-                sensorBody = Buffer.concat([sensorBody, buttonPressedCommand]);
-            });
-
-            const totalLength = initBuf.length + sensorBody.length;
-            const sendBuffer = Buffer.concat(
-                [initBuf, sensorBody],
-                totalLength
-            );
-            this.checkByteSize(sendBuffer);
-            this.sp.write(sendBuffer);
         }
         */
     }
