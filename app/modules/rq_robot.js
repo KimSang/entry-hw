@@ -574,7 +574,6 @@ class rq_robot extends BaseModule {
      * 센서를 200ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
      */
     sensorChecking() {
-        console.log("sensor");
         if (!this.isSensorCheck) {
             this.sensing = setInterval(() => {
                 this.sensorCheck();
@@ -595,7 +594,7 @@ class rq_robot extends BaseModule {
 
     eventController(state) {
         if (state === 'connected') {
-            clearInterval(this.sensing);
+//            clearInterval(this.sensing);
         }
     }
 
@@ -684,7 +683,6 @@ class rq_robot extends BaseModule {
                 handler.write(key, this.returnData[key]);
             }
         });
-  
     }
 
     handleRemoteData(handler) {
@@ -1030,12 +1028,12 @@ class rq_robot extends BaseModule {
      * 보내는 데이터는 여러개의 데이터 명령이고 받는 결과 또한 여러개의 결과값이다.
      */
     sensorCheck() {
-        /*
+        
         if (!this.isSensing) {
             this.isSensing = true;
 
             let index = 0;
-            Object.keys(this.SENSOR_MAP).forEach((p) => {
+            Object.keys(this.SENSOR_MAP).filter((p) => {
                 let mode = 0;
                 if (this.returnData[p] && this.returnData[p]['type']) {
                     mode = this.SENSOR_MAP[p]['mode'] || 0;
@@ -1051,10 +1049,16 @@ class rq_robot extends BaseModule {
                         this.sp.write(buf);
                         break;
                     case this.deviceTypes.RQ_Inf_1:
+                        var buf = this.GetTouchIR(1);
+                        this.sp.write(buf);
                         break;
                     case this.deviceTypes.RQ_Inf_2:
+                        var buf = this.GetTouchIR(4);
+                        this.sp.write(buf);
                         break;
                     case this.deviceTypes.RQ_Remote:
+                        var buf = this.GetRemote();
+                        this.sp.write(buf);
                         break;
                     case this.deviceTypes.RQ_Sound:
                         break;
@@ -1062,7 +1066,7 @@ class rq_robot extends BaseModule {
             });
 
         }
-        */
+        
     }
 
     connect() {}

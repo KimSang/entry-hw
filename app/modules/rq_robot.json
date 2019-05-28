@@ -1,5 +1,5 @@
 {
-	"id": "FFFF",
+	"id": "310101",
 	"name": {
 		"en": "RQ Robot",
 		"ko": "RQ 로봇"
@@ -12,7 +12,7 @@
         "win32-ia32": "RQ_Robot/CP210xVCPInstaller_x86.exe",
         "win32-x64": "RQ_Robot/CP210xVCPInstaller_x64.exe"
     },
-	"url": "https://www.robobuilder.co.kr/goods/goods_list.php?cateCd=006",
+	"url": "https://www.robobuilder.co.kr",
 	"entry": {
 		"protocol": "json"
 	},
