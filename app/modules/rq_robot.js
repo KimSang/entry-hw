@@ -895,14 +895,13 @@ class RQ extends BaseModule {
                         }
                         break;
                     case 'O':
-                        if(!(map1.cmd === map2.cmd))
+                        if(!(map1.cmd === map2.cmd && map1.stop === map2.stop))
                         {
-                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && (map1.stop == 1))
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && (Number(map1.stop) == 1))
                             {
                                 let buf = this.PlaySound(0);
                                 this.sp.write(buf);
                                 map1.stop = 0;
-                                map1.cmd = 0;
                             }
                             ret = true;
                         }
