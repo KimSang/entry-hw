@@ -1,7 +1,7 @@
 const _ = require('lodash');
 const BaseModule = require('./baseModule');
 
-class rq_robot extends BaseModule {
+class RQ extends BaseModule {
     constructor() {
         super();
 
@@ -260,10 +260,11 @@ class rq_robot extends BaseModule {
         buffer[buffer.length - 1] = checksum;
     }
 
-    		/// <summary>
-		/// PC 직접제어 모드 설정
-		/// </summary>
-    SetDirectControlMode()
+    /**
+     * PC 제어 모드 진입 명령 버퍼를 생성하는 함수이다. 
+     * @param null
+     * @returns PC 제어 모드 진입 명령 버퍼를 리턴한다.  
+     */    SetDirectControlMode()
     {
         let bySize = new Buffer(4);
 
@@ -275,9 +276,11 @@ class rq_robot extends BaseModule {
         return this.GetCommand(16, bySize, new Buffer([1]));
     }
 
-    /// <summary>
-    /// RQC 제어모드 설정
-    /// </summary>
+    /**
+     * RQC 제어 모드 진입 명령 버퍼를 생성하는 함수이다. 
+     * @param null
+     * @returns RQC 제어 모드 진입 명령 버퍼를 리턴한다.  
+     */
     SetRQCControlMode()
     {
         let b = new Buffer(3);
@@ -287,8 +290,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
-    // 직접제어명령
-    // 서보모터 상태조회
+    /**
+     * 서보 모터의 각도 값을 얻어오는 함수이다. 
+     * @param ID Servo Motor Number
+     * @returns ID 값을 기준으로 서보모터의 각도를 얻기위한 명령 버퍼를 리턴한다.  
+     */
     GetServoPosition(ID)
     {
         let b = new Buffer(1);
@@ -296,12 +302,13 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(5, ID, b, 1);
     }
 
-    /// <summary>
-    /// 서보모터 위치 설정
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <param name="Position"></param>
-    /// <param name="speed"></param>
+    /**
+     * 서보 모터의 각도를 조정하는 함수이다. 
+     * @param ID Servo Motor Number
+     * @param Position 서보 모터 각도 
+     * @param Speed 모터 모드  
+     * @returns ID, Position, Speed 값을 기준으로 서보모터 각도를 제어하는 명령 버퍼를 리턴한다.  
+     */
     SetServoPosion(ID, Position, speed)
     {
         let b = new Buffer(1);
@@ -309,31 +316,14 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(speed, ID, b, 1);
     }
 
-    /// <summary>
-    /// 서보모터 위치 설정
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <param name="Position"></param>
-    /// <param name="speed"></param>
-    SetServoSyncPosion(Position, Speed)
-    {
-        let b = new Buffer(Position.length + 1);
-        b[0] = Position.length;
 
-        for (let i = 0; i < Position.length; i++)
-        {
-            b[i + 1] = Position[i];
-        }
-
-        return this.GetDirectCommand(Speed, 31, b, 2);
-    }
-
-    /// <summary>
-    /// 모터회전
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <param name="Direction"></param>
-    /// <param name="Speed"></param>
+    /**
+     * 모터를 작동 시키는 명령을 생성하는 함수이다.  
+     * @param ID Servo Motor Number
+     * @param Direction 모터 회전 방향
+     * @param Speed 회전 속도 
+     * @returns ID, Direction, Speed 값에 따라 모터를 작동 시키는 명령 버퍼를 리턴한다. 
+     */
     RotateMotor(ID, Direction, Speed)
     {
         if (Speed < 0)
@@ -355,51 +345,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(6, ID, b, 1);
     }
 
-    /// <summary>
-    /// 모터 PWM 제어
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <param name="Speed"></param>
-    /// <returns></returns>
-    PWMMotor(ID, Speed)
-    {
-        if (Speed > 254)
-        {
-            Speed = 254;
-        }
-        if (Speed < -254)
-        {
-            Speed = -254;
-        }
-
-        let direction = 0;
-
-        if (Speed > 0)
-        {
-            direction = 0;
-        }
-        else
-        {
-            direction = 1;
-        }
-
-        let b1 = 5;
-        b1 <<= 4;
-        b1 += direction;
-
-        let b = new Buffer(3);
-        b[0] = b1;
-        b[1] = Math.Abs(Speed);
-        b[2] = direction;
-
-        return this.GetDirectCommand(6, ID, b, 1);
-    }
-
-
-
-    /// <summary>
-    /// 브레이크 모드
-    /// </summary>
+    /**
+     * 모터를 정지 시키는 명령 버퍼를 생성하는 함수이다.  
+     * @param null
+     * @returns 모터 정리 명령 버퍼를 리턴한다. 
+     */
     BreakMode()
     {
         let b1 = 2;
@@ -411,9 +361,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(6, 31, b, 1);
     }
 
-    /// <summary>
-    /// 페시브 모드
-    /// </summary>
+    /**
+     * 서보 모터를 Passive 모드로 변경하는 명령 버퍼를 생성한다.  
+     * @param ID Servo Motor Number
+     * @returns ID 값에 따라 PassiveMode 변경 명령 버퍼를 리턴한다. 
+     */
     PassiveMode(ID)
     {
         let b1 = 1;
@@ -425,10 +377,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(6, ID, b, 1);
     }
 
-    /// <summary>
-    /// 서보모터 LED 상태 조회
-    /// </summary>
-    /// <param name="ID"></param>
+    /**
+     * 서보 모터의 LED 상태 조회 명령 버퍼를 생성하는 함수이다.  
+     * @param ID Servo Motor Number
+     * @returns ID 값에 따라 LED 상태 조회 명령 버퍼를 리턴한다. 
+     */
     GetServoLed(ID)
     {
         let b = new Buffer(3);
@@ -439,11 +392,12 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, ID, b, 1);
     }
 
-    /// <summary>
-    /// 서보모터의 LED 상태 설정
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <param name="isOn"></param>
+    /**
+     * 서보모터에 내장된 LED의 상태를 조작하는 명령 버퍼를 생성하는 함수이다. 
+     * @param ID Servo Motor Number
+     * @param isOn LED 상태 
+     * @returns ID, isOn 값에 따라 명령 버퍼를 리턴한다. 
+     */
     SetServoLed(ID, isOn)
     {
         let b = new Buffer(3);
@@ -461,11 +415,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, ID, b, 1);
     }
 
-    /// <summary>
-    /// 터치 및 IR 값 조회
-    /// </summary>
-    /// <param name="ID"></param>
-    /// <returns></returns>
+    /**
+     * Touch 및 IR 센서 조회 명령 버퍼를 생성하는 함수이다. 
+     * @param ID 조회하고자 하는 센서의 정보
+     * @returns ID 값을 기반으로 조회 명령 버퍼를 리턴한다. 
+     */
     GetTouchIR(ID)
     {
         let b = new Buffer(3);
@@ -476,10 +430,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, ID, b, 1);
     }
 
-    /// <summary>
-    /// 마이크 값 조회
-    /// </summary>
-    /// <returns></returns>
+    /**
+     * 마이크 값 조회 명령 버퍼를 생성하는 함수이다. 
+     * @param null
+     * @returns 입력된 마이크 값 조회 명령 버퍼를 리턴한다. 
+     */
     GetMic()
     {
         let b = new Buffer(3);
@@ -490,10 +445,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
-    /// <summary>
-    /// 리모콘 값 조회
-    /// </summary>
-    /// <returns></returns>
+    /**
+     * 입력된 리모콘 값 조회 명령 버퍼를 생성하는 함수이다. 
+     * @param null
+     * @returns 입력된 리모콘 값 조회 명령 버퍼를 리턴한다. 
+     */
     GetRemote()
     {
         let b = new buffer(3);
@@ -515,6 +471,12 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, ID, b, 1);
     }
 
+    /**
+     * 모션 명령 버퍼 생성 작업을 수행하는 함수이다. 
+     * @param MotionNo Motion Number 
+     * @returns MotionNo 를 기반으로 모션 명령 버퍼를 리턴한다.  
+     */
+
     DoMotion(MotionNo)
     {
         let b = new Buffer(3);
@@ -525,9 +487,11 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
-    /// 사운드 출력
-    /// </summary>
-    /// <param name="SoundNo"></param>
+    /**
+     * 사운드 재생 명령 버퍼 생성 작업을 수행하는 함수이다. 
+     * @param SoundNo Sound Number
+     * @returns SoundNo 를 기반으로 사운드 재생 명령 버퍼를 리턴한다.  
+     */
     PlaySound(SoundNo)
     {
         //FF E0 DD 00 01 3C
@@ -540,10 +504,12 @@ class rq_robot extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
-    /// <summary>
-    /// 에러코드 조회
-    /// </summary>
-    /// <param name="type"></param>
+    /**
+     * 에러 코드 명령 버퍼 생성 작업을 수행하는 함수이다. 
+     * @param type ErrorCode Type 
+     * @returns Buffer type를 기반으로 에러코드 조회 명령 버퍼를 리턴한다. 
+     */
+
     GetErrorCode(type)
     {
         return this.GetCommand(17, new Buffer([0, 0, 0, 1 ]), new Buffer([type]));
@@ -557,29 +523,15 @@ class rq_robot extends BaseModule {
         }
     }
 
-
     /**
-     * size 를 해당하는 2byte 를 제외한 값을 size 에 씌운다.
-     *
-     * TODO 그렇다면 makeInitBuffer의 size는 영원히 아무일도 하지 않는다.
-     * @param buffer 파라미터가 완성된 buffer
-     */
-    checkByteSize(buffer) {
-        const bufferlength = buffer.length - 2;
-        buffer[0] = bufferlength;
-        buffer[1] = bufferlength >> 8; // buffer length 가 2^8 을 넘는 값일경우, 남은 값을 다음 size byte 에 씌운다.
-    }
-
-    /**
-     * 센서를 200ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
+     * 센서를 500ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
      */
     sensorChecking() {
         if (!this.isSensorCheck) {
             this.sensing = setInterval(() => {
                 this.sensorCheck();
-                console.log("sensorChecking");
                 this.isSensing = false;
-            }, 200);
+            }, 500);
             this.isSensorCheck = true;
         }
     }
@@ -593,9 +545,10 @@ class rq_robot extends BaseModule {
     lostController() {}
 
     eventController(state) {
+        /*
         if (state === 'connected') {
-//            clearInterval(this.sensing);
-        }
+            clearInterval(this.sensing);
+        }*/
     }
 
     setSerialPort(sp) {
@@ -603,7 +556,8 @@ class rq_robot extends BaseModule {
     }
 
     /**
-     * 모터를 정지하고, output 센서를 체크한다.
+     * 전원 투입 후 기본 상태는 RBC 제어 모드로 되어 있다. 
+     * MSRS 서비스 실행시 PC 제어 모드로 변경 후 서비스 종료시에는 RBC 제어 모드로 돌아오는 것을 원칙으로 한다. 
      * @param sp serial port
      * @returns {null} 직접 serial port 에 ByteArray 를 작성한다.
      */
@@ -635,7 +589,6 @@ class rq_robot extends BaseModule {
 
     handleLocalData(data) {
         console.log(data);
-        this.isSensing = false;
         /*
         if (data[0] === this.wholeResponseSize + 3 && data[1] === 0) {
             const countKey = data.readInt16LE(2);
@@ -678,11 +631,14 @@ class rq_robot extends BaseModule {
 
     // Web Socket(엔트리)에 전달할 데이터
     requestRemoteData(handler) {
+        
         Object.keys(this.returnData).forEach((key) => {
             if (this.returnData[key] !== undefined) {
                 handler.write(key, this.returnData[key]);
             }
         });
+
+        
     }
 
     handleRemoteData(handler) {
@@ -1023,7 +979,6 @@ class rq_robot extends BaseModule {
     /**
      * requestInitialData(external interval) -> sensorChecking(interval) -> sensorCheck
      * 센서데이터를 연결해 한번에 보낸다.
-     * output 이 존재하는 Port 1,2,3,4 번을 체크한다.
      *
      * 보내는 데이터는 여러개의 데이터 명령이고 받는 결과 또한 여러개의 결과값이다.
      */
@@ -1108,4 +1063,4 @@ class rq_robot extends BaseModule {
     }
 }
 
-module.exports = new rq_robot();
+module.exports = new RQ();
