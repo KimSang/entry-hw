@@ -101,26 +101,32 @@ class RQ extends BaseModule {
             I: {
                 type : this.deviceTypes.RQ_Touch_1,
                 mode : 0,
+                value : 0,
             },
             J: {
                 type : this.deviceTypes.RQ_Touch_2,
                 mode : 0,
+                value : 0,
             },
             K1: {
                 type : this.deviceTypes.RQ_Remote,
                 mode : 0,
+                value : 0,
             },
             K2: {
                 type : this.deviceTypes.RQ_Sound,
                 mode : 0,
+                value : 0,
             },
             L1: {
                 type : this.deviceTypes.RQ_Inf_1,
                 mode : 0,
+                value : 0,
             },
             L2: {
                 type : this.deviceTypes.RQ_Inf_2,
                 mode : 0,
+                value : 0,
             },
         },
 
@@ -452,7 +458,7 @@ class RQ extends BaseModule {
      */
     GetRemote()
     {
-        let b = new buffer(3);
+        let b = new Buffer(3);
         b[0] = 232;
         b[1] = 0;
         b[2] = 0;
@@ -460,6 +466,12 @@ class RQ extends BaseModule {
         return this.GetDirectCommand(7, 0, b, 1);
     }
 
+    /**
+     * LED 제어 명령 버퍼를 생성하는 함수이다.  
+     * @param ID LED Number
+     * @param type LED Color
+     * @returns ID, type를 기반으로 LED 제어 명령 버퍼를 리턴한다.  
+     */
     SetLed(ID, type)
     {
         let b = new Buffer(3);
@@ -476,7 +488,6 @@ class RQ extends BaseModule {
      * @param MotionNo Motion Number 
      * @returns MotionNo 를 기반으로 모션 명령 버퍼를 리턴한다.  
      */
-
     DoMotion(MotionNo)
     {
         let b = new Buffer(3);
@@ -545,7 +556,7 @@ class RQ extends BaseModule {
     lostController() {}
 
     eventController(state) {
-        /*
+        /*        
         if (state === 'connected') {
             clearInterval(this.sensing);
         }*/
@@ -587,46 +598,63 @@ class RQ extends BaseModule {
         return true;
     }
 
-    handleLocalData(data) {
-        console.log(data);
-        /*
-        if (data[0] === this.wholeResponseSize + 3 && data[1] === 0) {
-            const countKey = data.readInt16LE(2);
-            if (countKey in this.SENSOR_COUNTER_LIST) {
-                this.isSensing = false;
-                delete this.SENSOR_COUNTER_LIST[countKey];
-                data = data.slice(5); // 앞의 4 byte 는 size, counter 에 해당한다. 이 값은 할당 후 삭제한다.
-                let index = 0;
-
-                Object.keys(this.SENSOR_MAP).forEach((p) => {
-                    const port = Number(p) - 1;
-                    index = port * this.commandResponseSize;
-
-                    const type = data[index];
-                    const mode = data[index + 1];
-                    let siValue = Number(
-                        (data.readFloatLE(index + 2) || 0).toFixed(1)
-                    );
-                    this.returnData[p] = {
-                        type: type,
-                        mode: mode,
-                        siValue: siValue,
-                    };
-                });
-
-                index = 4 * this.commandResponseSize;
-                Object.keys(this.BUTTON_MAP).forEach((button) => {
-                    if (data[index] === 1) {
-                        console.log(button + ' button is pressed');
-                    }
-
-                    this.returnData[button] = {
-                        pressed: data[index++] === 1,
-                    };
-                });
-            }
+    setInputDevice(buffer)
+    {
+        switch(buffer[2])
+        {
+            case 234:   // Mic
+                this.returnData['K2'] = {
+                    type : this.deviceTypes.RQ_Sound,
+                    mode : 1,
+                    value : buffer[0]
+                }
+                console.log(buffer[0]);
+                break;
+            case 0:     //Touch 1
+                this.returnData['I'] = {
+                    type : this.deviceTypes.RQ_Touch_1,
+                    mode : 1,
+                    value : buffer[1]
+                }
+                console.log(buffer[1]);
+                break;
+            case 1:     //IR 1
+                this.returnData['L1'] = {
+                    type : this.deviceTypes.RQ_Inf_1,
+                    mode : 1,
+                    value : buffer[1]
+                }
+                console.log(buffer[1]);
+                break;
+            case 2:     //Touch 2
+                this.returnData['J'] = {
+                    type : this.deviceTypes.RQ_Touch_2,
+                    mode : 1,
+                    value : buffer[1]
+                }
+                console.log(buffer[1]);
+                break;
+            case 3:     //IR 2
+                this.returnData['L2'] = {
+                    type : this.deviceTypes.RQ_Inf_2,
+                    mode : 1,
+                    value : buffer[1]
+                }
+                console.log(buffer[1]);
+                break;
         }
-        */
+    }
+
+    handleLocalData(data) {
+
+        if(data.length == 3)
+        {
+            this.setInputDevice(data);
+        }
+        else if(data.length == 6)
+        {
+            this.setInputDevice(data);
+        }
     }
 
     // Web Socket(엔트리)에 전달할 데이터
@@ -637,8 +665,7 @@ class RQ extends BaseModule {
                 handler.write(key, this.returnData[key]);
             }
         });
-
-        
+   
     }
 
     handleRemoteData(handler) {
@@ -760,7 +787,6 @@ class RQ extends BaseModule {
                             if( map1.cmd == this.COMMAND_MAP.rq_cmd_move_sam3_motor)
                             {
                                 let buf = this.RotateMotor(Number(map1.motor), Number(map1.direction), Number(map1.speed));
-                                console.log(buf);
                                 this.sp.write(buf);
                             }
 
@@ -863,21 +889,20 @@ class RQ extends BaseModule {
                             if( map1.cmd == this.COMMAND_MAP.rq_cmd_play_sound_second)
                             {
                                 let buf = this.PlaySound(Number(map1.play_list));
-                                let stop_buf = this.PlaySound(0);
-
                                 this.sp.write(buf);
-                            }
+                            } 
                             ret = true;
                         }
                         break;
                     case 'O':
                         if(!(map1.cmd === map2.cmd))
                         {
-                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && map1.stop == 1)
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && (map1.stop == 1))
                             {
                                 let buf = this.PlaySound(0);
                                 this.sp.write(buf);
                                 map1.stop = 0;
+                                map1.cmd = 0;
                             }
                             ret = true;
                         }
@@ -989,33 +1014,32 @@ class RQ extends BaseModule {
 
             let index = 0;
             Object.keys(this.SENSOR_MAP).filter((p) => {
-                let mode = 0;
-                if (this.returnData[p] && this.returnData[p]['type']) {
-                    mode = this.SENSOR_MAP[p]['mode'] || 0;
-                }
-                switch(p.type)
+
+                switch(p)
                 {
-                    case this.deviceTypes.RQ_Touch_1:
+                    case 'I':
                         var buf = this.GetTouchIR(0);
                         this.sp.write(buf);
                         break;
-                    case this.deviceTypes.RQ_Touch_2:
+                    case 'J':
                         var buf = this.GetTouchIR(2);
                         this.sp.write(buf);
                         break;
-                    case this.deviceTypes.RQ_Inf_1:
+                    case 'L1':
                         var buf = this.GetTouchIR(1);
                         this.sp.write(buf);
                         break;
-                    case this.deviceTypes.RQ_Inf_2:
-                        var buf = this.GetTouchIR(4);
+                    case 'L2':
+                        var buf = this.GetTouchIR(3);
                         this.sp.write(buf);
                         break;
-                    case this.deviceTypes.RQ_Remote:
+                    case 'K1':
                         var buf = this.GetRemote();
                         this.sp.write(buf);
                         break;
-                    case this.deviceTypes.RQ_Sound:
+                    case 'K2':
+                        var buf = this.GetMic();
+                        this.sp.write(buf);
                         break;
                 }
             });
