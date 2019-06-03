@@ -32,25 +32,26 @@ class RQ extends BaseModule {
         };
 
         this.COMMAND_MAP = {
-                'rq_cmd_move_dc_motor' : 1,
-                'rq_cmd_set_dc_motor_position' : 2,
-                'rq_cmd_stop_dc_motor' : 3,
-                'rq_cmd_move_sam3_motor' : 4,
-                'rq_cmd_set_sam3_motor_position' : 5,
-                'rq_cmd_on_sam3_led' : 6,
-                'rq_cmd_off_sam3_led' : 7,
-                'rq_cmd_move_sam3_motor_manual' : 8,
-                'rq_cmd_get_sam3_motor_position' : 9,
-                'rq_cmd_sound_sensor' : 10,
-                'rq_cmd_remote_control' : 11,
-                'rq_cmd_infrared_ray_sensor' : 12,
-                'rq_cmd_touch_sensor' : 13,
-                'rq_cmd_play_sound' : 14,
-                'rq_cmd_play_sound_second' : 15,
-                'rq_cmd_stop_sound' : 16,
-                'rq_cmd_on_led' : 17,
-                'rq_cmd_off_led' : 18,
-                'rq_cmd_motion' : 19,
+            'rq_cmd_move_dc_motor' : 1,
+            'rq_cmd_set_dc_motor_position' : 2,
+            'rq_cmd_stop_dc_motor' : 3,
+            'rq_cmd_move_sam3_motor' : 4,
+            'rq_cmd_set_sam3_motor_position' : 5,
+            'rq_cmd_on_sam3_led' : 6,
+            'rq_cmd_off_sam3_led' : 7,
+            'rq_cmd_move_sam3_motor_manual' : 8,
+            'rq_cmd_get_sam3_motor_position' : 9,
+            'rq_cmd_con_sam3_motor_position' : 10,
+            'rq_cmd_sound_sensor' : 11,
+            'rq_cmd_remote_control' : 12,
+            'rq_cmd_infrared_ray_sensor' : 13,
+            'rq_cmd_touch_sensor' : 14,
+            'rq_cmd_play_sound' : 15,
+            'rq_cmd_play_sound_second' : 16,
+            'rq_cmd_stop_sound' : 17,
+            'rq_cmd_on_led' : 18,
+            'rq_cmd_off_led' : 19,
+            'rq_cmd_motion' : 20,
         },
 
         this.DC_MOTOR_MAP = {
@@ -92,6 +93,10 @@ class RQ extends BaseModule {
                 motor : 0,
             },
             H: {
+                cmd: 0,
+                motor : 0,
+            },
+            H1: {
                 cmd: 0,
                 motor : 0,
             },
@@ -202,13 +207,6 @@ class RQ extends BaseModule {
 
         return buf;
     }
-
-    GetCommand(nCommand, bySize, contents)
-    {
-        let buf = this.MakeCommand(nCommand, bySize, contents);
-
-        return buf;
-    }
     
     GetDirectCommand(Mode, SID, data, ChecksumType)
     {
@@ -270,7 +268,8 @@ class RQ extends BaseModule {
      * PC 제어 모드 진입 명령 버퍼를 생성하는 함수이다. 
      * @param null
      * @returns PC 제어 모드 진입 명령 버퍼를 리턴한다.  
-     */    SetDirectControlMode()
+     */    
+    SetDirectControlMode()
     {
         let bySize = new Buffer(4);
 
@@ -279,7 +278,7 @@ class RQ extends BaseModule {
         bySize[2] = 0;
         bySize[3] = 1;
 
-        return this.GetCommand(16, bySize, new Buffer([1]));
+        return this.MakeCommand(16, bySize, new Buffer([1]));
     }
 
     /**
@@ -523,7 +522,7 @@ class RQ extends BaseModule {
 
     GetErrorCode(type)
     {
-        return this.GetCommand(17, new Buffer([0, 0, 0, 1 ]), new Buffer([type]));
+        return this.MakeCommand(17, new Buffer([0, 0, 0, 1 ]), new Buffer([type]));
     }
 
     // cb 은 화면의 이벤트를 보내는 로직입니다. 여기서는 connected 라는 신호를 보내 강제로 연결됨 화면으로 넘어갑니다.
@@ -646,6 +645,7 @@ class RQ extends BaseModule {
     }
 
     handleLocalData(data) {
+        console.log(data);
 
         if(data.length == 3)
         {
@@ -703,7 +703,7 @@ class RQ extends BaseModule {
                 const map1 = this.DC_MOTOR_MAP[port];
                 const map2 = this.LAST_DC_MOTOR_MAP[port];
                 let ret = 0;
-                
+
                 switch(port)
                 {
                     case 'A':
@@ -897,7 +897,7 @@ class RQ extends BaseModule {
                     case 'O':
                         if(!(map1.cmd === map2.cmd && map1.stop === map2.stop))
                         {
-                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && (Number(map1.stop) == 1))
+                            if(map1.cmd == this.COMMAND_MAP.rq_cmd_stop_sound && map1.stop == 1)
                             {
                                 let buf = this.PlaySound(0);
                                 this.sp.write(buf);
@@ -1010,8 +1010,7 @@ class RQ extends BaseModule {
         
         if (!this.isSensing) {
             this.isSensing = true;
-
-            let index = 0;
+            /*
             Object.keys(this.SENSOR_MAP).filter((p) => {
 
                 switch(p)
@@ -1042,9 +1041,10 @@ class RQ extends BaseModule {
                         break;
                 }
             });
+*/
 
-        }
         
+         }   
     }
 
     connect() {}
