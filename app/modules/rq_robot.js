@@ -21,6 +21,7 @@ class RQ extends BaseModule {
         this.CHECK_MOTION_MAP = {};
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
+        this.get_pos = 0;
 
         this.deviceTypes = {
             RQ_Touch_1: 1,
@@ -95,6 +96,7 @@ class RQ extends BaseModule {
             H: {
                 cmd: 0,
                 motor : 0,
+                mode : 0,
             },
             H1: {
                 cmd: 0,
@@ -104,32 +106,32 @@ class RQ extends BaseModule {
 
         this.SENSOR_MAP = {
             I: {
-                type : this.deviceTypes.RQ_Touch_1,
-                mode : 0,
-                value : 0,
-            },
-            J: {
-                type : this.deviceTypes.RQ_Touch_2,
-                mode : 0,
-                value : 0,
-            },
-            K1: {
-                type : this.deviceTypes.RQ_Remote,
-                mode : 0,
-                value : 0,
-            },
-            K2: {
                 type : this.deviceTypes.RQ_Sound,
                 mode : 0,
                 value : 0,
             },
-            L1: {
+            J: {
+                type : this.deviceTypes.RQ_Remote,
+                mode : 0,
+                value : 0,
+            },
+            K1: {
                 type : this.deviceTypes.RQ_Inf_1,
                 mode : 0,
                 value : 0,
             },
-            L2: {
+            K2: {
                 type : this.deviceTypes.RQ_Inf_2,
+                mode : 0,
+                value : 0,
+            },
+            L1: {
+                type : this.deviceTypes.RQ_Touch_1,
+                mode : 0,
+                value : 0,
+            },
+            L2: {
+                type : this.deviceTypes.RQ_Touch_2,
                 mode : 0,
                 value : 0,
             },
@@ -597,63 +599,32 @@ class RQ extends BaseModule {
         return true;
     }
 
-    setInputDevice(buffer)
-    {
-        switch(buffer[2])
-        {
-            case 234:   // Mic
-                this.returnData['K2'] = {
-                    type : this.deviceTypes.RQ_Sound,
-                    mode : 1,
-                    value : buffer[0]
-                }
-                console.log(buffer[0]);
-                break;
-            case 0:     //Touch 1
-                this.returnData['I'] = {
-                    type : this.deviceTypes.RQ_Touch_1,
-                    mode : 1,
-                    value : buffer[1]
-                }
-                console.log(buffer[1]);
-                break;
-            case 1:     //IR 1
-                this.returnData['L1'] = {
-                    type : this.deviceTypes.RQ_Inf_1,
-                    mode : 1,
-                    value : buffer[1]
-                }
-                console.log(buffer[1]);
-                break;
-            case 2:     //Touch 2
-                this.returnData['J'] = {
-                    type : this.deviceTypes.RQ_Touch_2,
-                    mode : 1,
-                    value : buffer[1]
-                }
-                console.log(buffer[1]);
-                break;
-            case 3:     //IR 2
-                this.returnData['L2'] = {
-                    type : this.deviceTypes.RQ_Inf_2,
-                    mode : 1,
-                    value : buffer[1]
-                }
-                console.log(buffer[1]);
-                break;
-        }
-    }
-
     handleLocalData(data) {
-        console.log(data);
 
-        if(data.length == 3)
+        if(data.length == 2 && data[0] == 0xf3)
         {
-            this.setInputDevice(data);
+            this.returnData['L1'] = {
+                type : this.deviceTypes.RQ_Touch_1,
+                mode : 1,
+                value : ((data[1]==0xff)?1:0),
+            }
         }
-        else if(data.length == 6)
+        else if((data.length == 8 || data.length == 4) && data[0] == 0xf3)
         {
-            this.setInputDevice(data);
+            this.returnData['L2'] = {
+                type : this.deviceTypes.RQ_Touch_2,
+                mode : 1,
+                value : ((data[1]==0xff)?1:0),
+            }
+        }
+        else if(data.length == 2 && data[0] == 0x0)
+        {
+            console.log(data);
+            this.returnData['HR'] = {
+                motor : this.SAM3_MOTOR_MAP['H'].motor,
+                value : Number(data[1]),
+            }
+            this.get_pos = Number(data[1]);
         }
     }
 
@@ -835,19 +806,18 @@ class RQ extends BaseModule {
                             }
                         }
                         break;
-                    case 'H':
-                        if(!(map1.cmd === map2.cmd && 
-                            map1.motor === map2.motor ))
-                        {
-                            ret = true;
-                            if( map1.cmd == this.COMMAND_MAP.rq_cmd_get_sam3_motor_position)
+                    case 'H1':
+                            if(!(map1.cmd === map2.cmd && 
+                                map1.motor === map2.motor))
                             {
-                                let buf = this.GetServoPosition(Number(map1.motor));
-                                this.sp.write(buf);
+                                ret = true;   
+                                if(map1.cmd == this.COMMAND_MAP.rq_cmd_con_sam3_motor_position)
+                                {
+                                    let buf = this.SetServoPosion(Number(map1.motor), this.get_pos, 2);
+                                    this.sp.write(buf);
+                                }
                             }
-
-                        }
-                        break;
+                            break;
                     default:
                         ret = false;
                 }
@@ -1010,7 +980,13 @@ class RQ extends BaseModule {
         
         if (!this.isSensing) {
             this.isSensing = true;
-            /*
+
+            if(this.SAM3_MOTOR_MAP['H'].mode == 1)
+            {
+                let buf = this.GetServoPosition(this.SAM3_MOTOR_MAP['H'].motor);
+                this.sp.write(buf);
+            }
+
             Object.keys(this.SENSOR_MAP).filter((p) => {
 
                 switch(p)
@@ -1041,10 +1017,8 @@ class RQ extends BaseModule {
                         break;
                 }
             });
-*/
-
-        
-         }   
+    
+        }      
     }
 
     connect() {}
@@ -1072,7 +1046,7 @@ class RQ extends BaseModule {
                 
                 connect.close();
                 if (this.sp) {
-                    delete self.sp;
+                    delete this.sp;
                 }
             }
             else{
