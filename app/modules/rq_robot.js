@@ -93,11 +93,6 @@ class RQ extends BaseModule {
                 cmd: 0,
                 motor : 0,
             },
-            H: {
-                cmd: 0,
-                motor : 0,
-                mode : 0,
-            },
             H1: {
                 cmd: 0,
                 motor : 0,
@@ -600,13 +595,33 @@ class RQ extends BaseModule {
     }
 
     handleLocalData(data) {
+        console.log(data);
 
-        if(data.length == 2 && data[0] == 0xf3)
+        if(data.length == 2)
         {
-            this.returnData['L1'] = {
-                type : this.deviceTypes.RQ_Touch_1,
-                mode : 1,
-                value : ((data[1]==0xff)?1:0),
+            if(data[0] == 0xf3)
+            {
+                this.returnData['L1'] = {
+                    type : this.deviceTypes.RQ_Touch_1,
+                    mode : 1,
+                    value : ((data[1]==0xff)?1:0),
+                }
+            }
+            else if(data[0] == 0xea)
+            {
+                this.returnData['I'] = {
+                    type : this.deviceTypes.RQ_Sound,
+                    mode : 1,
+                    value : Number(data[1]),
+                }
+            }
+            else if(data[0] == 0x0)
+            {
+                this.returnData['HR'] = {
+                    motor : Number(data[0]),
+                    value : Number(data[1]),
+                }
+                this.get_pos = Number(data[1]);
             }
         }
         else if((data.length == 8 || data.length == 4) && data[0] == 0xf3)
@@ -616,15 +631,21 @@ class RQ extends BaseModule {
                 mode : 1,
                 value : ((data[1]==0xff)?1:0),
             }
-        }
-        else if(data.length == 2 && data[0] == 0x0)
-        {
-            console.log(data);
-            this.returnData['HR'] = {
-                motor : this.SAM3_MOTOR_MAP['H'].motor,
-                value : Number(data[1]),
+
+            if(data.length == 8)
+            {
+                this.returnData['K1'] = {
+                    type : this.deviceTypes.RQ_Inf_1,
+                    mode : 1,
+                    value : Number(data[5])
+                }
+
+                this.returnData['K2'] = {
+                    type : this.deviceTypes.RQ_Inf_2,
+                    mode : 1,
+                    value : Number(data[7])
+                }
             }
-            this.get_pos = Number(data[1]);
         }
     }
 
@@ -981,9 +1002,9 @@ class RQ extends BaseModule {
         if (!this.isSensing) {
             this.isSensing = true;
 
-            if(this.SAM3_MOTOR_MAP['H'].mode == 1)
+            for(let i = 0; i< 1; i++)
             {
-                let buf = this.GetServoPosition(this.SAM3_MOTOR_MAP['H'].motor);
+                let buf = this.GetServoPosition(i);
                 this.sp.write(buf);
             }
 
@@ -991,33 +1012,32 @@ class RQ extends BaseModule {
 
                 switch(p)
                 {
-                    case 'I':
+                    case 'L1':
                         var buf = this.GetTouchIR(0);
                         this.sp.write(buf);
                         break;
-                    case 'J':
+                    case 'L2':
                         var buf = this.GetTouchIR(2);
                         this.sp.write(buf);
                         break;
-                    case 'L1':
+                    case 'K1':
                         var buf = this.GetTouchIR(1);
                         this.sp.write(buf);
                         break;
-                    case 'L2':
+                    case 'K2':
                         var buf = this.GetTouchIR(3);
                         this.sp.write(buf);
                         break;
-                    case 'K1':
+                    case 'J':
                         var buf = this.GetRemote();
                         this.sp.write(buf);
-                        break;
-                    case 'K2':
+                        break;  
+                    case 'I':
                         var buf = this.GetMic();
                         this.sp.write(buf);
                         break;
                 }
             });
-    
         }      
     }
 
