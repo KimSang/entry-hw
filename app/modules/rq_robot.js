@@ -22,6 +22,7 @@ class RQ extends BaseModule {
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
         this.get_pos = 0;
+        this.isTouchGroupNo = 0;
 
         this.deviceTypes = {
             RQ_Touch_1: 1,
@@ -531,14 +532,14 @@ class RQ extends BaseModule {
     }
 
     /**
-     * 센서를 500ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
+     * 센서를 200ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
      */
     sensorChecking() {
         if (!this.isSensorCheck) {
             this.sensing = setInterval(() => {
                 this.sensorCheck();
                 this.isSensing = false;
-            }, 500);
+            }, 200);
             this.isSensorCheck = true;
         }
     }
@@ -595,11 +596,18 @@ class RQ extends BaseModule {
     }
 
     handleLocalData(data) {
-        console.log(data);
 
-        if(data.length == 2)
+        if(data.length == 0x02 && data[0] == 0x0)
         {
-            if(data[0] == 0xf3)
+            this.returnData['HR'] = {
+                motor : Number(data[0]),
+                value : Number(data[1]),
+            }
+            this.get_pos = Number(data[1]);
+        }
+        else if(data.length == 0x02 && data[0] == 0xf3)
+        {
+            if(this.isTouchGroupNo == 0x0)
             {
                 this.returnData['L1'] = {
                     type : this.deviceTypes.RQ_Touch_1,
@@ -607,45 +615,45 @@ class RQ extends BaseModule {
                     value : ((data[1]==0xff)?1:0),
                 }
             }
-            else if(data[0] == 0xea)
+            else if(this.isTouchGroupNo == 0x1)
             {
-                this.returnData['I'] = {
-                    type : this.deviceTypes.RQ_Sound,
+                this.returnData['L2'] = {
+                    type : this.deviceTypes.RQ_Touch_2,
                     mode : 1,
-                    value : Number(data[1]),
+                    value : ((data[1]==0xff)?1:0),
                 }
             }
-            else if(data[0] == 0x0)
-            {
-                this.returnData['HR'] = {
-                    motor : Number(data[0]),
-                    value : Number(data[1]),
-                }
-                this.get_pos = Number(data[1]);
-            }
-        }
-        else if((data.length == 8 || data.length == 4) && data[0] == 0xf3)
-        {
-            this.returnData['L2'] = {
-                type : this.deviceTypes.RQ_Touch_2,
-                mode : 1,
-                value : ((data[1]==0xff)?1:0),
-            }
-
-            if(data.length == 8)
+            else if(this.isTouchGroupNo == 0x2)
             {
                 this.returnData['K1'] = {
                     type : this.deviceTypes.RQ_Inf_1,
                     mode : 1,
-                    value : Number(data[5])
+                    value : Number(data[1])
                 }
-
+            }
+            else if(this.isTouchGroupNo == 0x3)
+            {
                 this.returnData['K2'] = {
                     type : this.deviceTypes.RQ_Inf_2,
                     mode : 1,
-                    value : Number(data[7])
+                    value : Number(data[1])
                 }
             }
+            this.isTouchGroupNo++;
+        }
+        else if(data.length == 0x02 && data[1] == 0x0 && this.isTouchGroupNo == 0x4)
+        {
+            this.returnData['I'] = {
+                type : this.deviceTypes.RQ_Sound,
+                mode : 1,
+                value : Number(data[0]),
+            }
+            this.isTouchGroupNo++;
+        }
+
+        if( this.isTouchGroupNo % 5 == 0)
+        {
+            this.isTouchGroupNo = 0;
         }
     }
 
@@ -657,7 +665,6 @@ class RQ extends BaseModule {
                 handler.write(key, this.returnData[key]);
             }
         });
-   
     }
 
     handleRemoteData(handler) {
@@ -689,7 +696,7 @@ class RQ extends BaseModule {
         let skipOutput_sound = false;
         let skipOutput_led = false;
         let skipOutput_motion = false;
-        
+
         if(this.LAST_DC_MOTOR_MAP) {
             const arr = Object.keys(this.DC_MOTOR_MAP).filter((port) => {
                 const map1 = this.DC_MOTOR_MAP[port];
@@ -1001,7 +1008,7 @@ class RQ extends BaseModule {
         
         if (!this.isSensing) {
             this.isSensing = true;
-
+  
             for(let i = 0; i< 1; i++)
             {
                 let buf = this.GetServoPosition(i);
@@ -1013,32 +1020,51 @@ class RQ extends BaseModule {
                 switch(p)
                 {
                     case 'L1':
-                        var buf = this.GetTouchIR(0);
-                        this.sp.write(buf);
+                        if(this.isTouchGroupNo == 0x0)
+                        {
+                            var buf = this.GetTouchIR(0);
+                            this.sp.write(buf);
+                        }
                         break;
                     case 'L2':
-                        var buf = this.GetTouchIR(2);
-                        this.sp.write(buf);
+                        if(this.isTouchGroupNo == 0x1)
+                        {
+                            var buf = this.GetTouchIR(2);
+                            this.sp.write(buf);
+                        }
                         break;
                     case 'K1':
-                        var buf = this.GetTouchIR(1);
-                        this.sp.write(buf);
+                        if(this.isTouchGroupNo == 0x2)
+                        {
+                            var buf = this.GetTouchIR(1);
+                            this.sp.write(buf);
+                        }
                         break;
                     case 'K2':
-                        var buf = this.GetTouchIR(3);
-                        this.sp.write(buf);
+                        if(this.isTouchGroupNo == 0x3)
+                        {
+                            var buf = this.GetTouchIR(3);
+                            this.sp.write(buf);
+                        }
                         break;
-                    case 'J':
-                        var buf = this.GetRemote();
-                        this.sp.write(buf);
-                        break;  
                     case 'I':
-                        var buf = this.GetMic();
-                        this.sp.write(buf);
+                        if(this.isTouchGroupNo == 0x4)
+                        {
+                            var buf = this.GetMic();
+                            this.sp.write(buf);
+                        }
+                        break;  
+                    case 'J':
+                        if(this.isTouchGroupNo == 0x5)
+                        {
+                            var buf = this.GetRemote();
+                            this.sp.write(buf);
+                        }
                         break;
                 }
             });
-        }      
+        }   
+        
     }
 
     connect() {}
