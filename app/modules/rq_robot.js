@@ -23,6 +23,7 @@ class RQ extends BaseModule {
         this.returnData = {};
         this.get_pos = 0;
         this.isTouchGroupNo = 0;
+        this.curr_pos = 0;
 
         this.deviceTypes = {
             RQ_Touch_1: 1,
@@ -597,8 +598,9 @@ class RQ extends BaseModule {
 
     handleLocalData(data) {
 
-        if(data.length == 0x02 && data[0] == 0x0)
+        if(data.length == 0x02 && data[0] == 0x0 && this.curr_pos != data[1])
         {
+            this.curr_pos = data[1];
             this.returnData['HR'] = {
                 motor : Number(data[0]),
                 value : Number(data[1]),
@@ -1008,7 +1010,7 @@ class RQ extends BaseModule {
         
         if (!this.isSensing) {
             this.isSensing = true;
-  
+
             for(let i = 0; i< 1; i++)
             {
                 let buf = this.GetServoPosition(i);
@@ -1063,6 +1065,7 @@ class RQ extends BaseModule {
                         break;
                 }
             });
+
         }   
         
     }
