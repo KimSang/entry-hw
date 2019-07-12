@@ -13,7 +13,6 @@ class RQ extends BaseModule {
         this.config = null;
         this.com_port = null;
 
-        this.sensors = [];
         this.CHECK_DC_MOTOR_MAP = {};
         this.CHECK_SAM3_MOTOR_MAP = {};
         this.CHECK_SOUND_MAP = {};
@@ -533,14 +532,14 @@ class RQ extends BaseModule {
     }
 
     /**
-     * 센서를 200ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
+     * 센서를 500ms 간격으로 체크한다. 센싱중에는 체크하지 않는다.
      */
     sensorChecking() {
         if (!this.isSensorCheck) {
             this.sensing = setInterval(() => {
                 this.sensorCheck();
                 this.isSensing = false;
-            }, 200);
+            }, 500);
             this.isSensorCheck = true;
         }
     }
@@ -597,6 +596,9 @@ class RQ extends BaseModule {
     }
 
     handleLocalData(data) {
+        
+        const reg_Sound = /\w\w \w\w e0 ea/gm;
+        const reg_Sensor = /f3 \w\w e\w f3/gm;
 
         if(data.length == 0x02 && data[0] == 0x0 && this.curr_pos != data[1])
         {
@@ -804,6 +806,9 @@ class RQ extends BaseModule {
                             {
                                 let buf = this.SetServoPosion(Number(map1.motor), Number(map1.position), 2);
                                 this.sp.write(buf);
+                                console.log("++++++++++++++++++++++++++++++");
+                                console.log(buf);
+                                console.log("++++++++++++++++++++++++++++++");
                             }
                         }
                         break;
@@ -1011,57 +1016,41 @@ class RQ extends BaseModule {
         if (!this.isSensing) {
             this.isSensing = true;
 
-            for(let i = 0; i< 1; i++)
+/*
+            for(let i = 0; i< 10; i++)
             {
-                let buf = this.GetServoPosition(i);
+                let buf = this.GetServoPosition(1);
                 this.sp.write(buf);
             }
+*/
 
             Object.keys(this.SENSOR_MAP).filter((p) => {
 
                 switch(p)
                 {
                     case 'L1':
-                        if(this.isTouchGroupNo == 0x0)
-                        {
-                            var buf = this.GetTouchIR(0);
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetTouchIR(0);
+                        this.sp.write(buf);
                         break;
                     case 'L2':
-                        if(this.isTouchGroupNo == 0x1)
-                        {
-                            var buf = this.GetTouchIR(2);
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetTouchIR(2);
+                        this.sp.write(buf);
                         break;
                     case 'K1':
-                        if(this.isTouchGroupNo == 0x2)
-                        {
-                            var buf = this.GetTouchIR(1);
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetTouchIR(1);
+                        this.sp.write(buf);
                         break;
                     case 'K2':
-                        if(this.isTouchGroupNo == 0x3)
-                        {
-                            var buf = this.GetTouchIR(3);
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetTouchIR(3);
+                        this.sp.write(buf);
                         break;
                     case 'I':
-                        if(this.isTouchGroupNo == 0x4)
-                        {
-                            var buf = this.GetMic();
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetMic();
+                        this.sp.write(buf);
                         break;  
                     case 'J':
-                        if(this.isTouchGroupNo == 0x5)
-                        {
-                            var buf = this.GetRemote();
-                            this.sp.write(buf);
-                        }
+                        var buf = this.GetRemote();
+                        this.sp.write(buf);
                         break;
                 }
             });
