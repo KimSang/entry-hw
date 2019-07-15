@@ -21,6 +21,7 @@ class RQ extends BaseModule {
         this.SENSOR_COUNTER_LIST = {};
         this.returnData = {};
         this.get_pos = 0;
+        this.mor_pos = 0;
         this.isTouchGroupNo = 0;
         this.curr_pos = 0;
 
@@ -596,9 +597,73 @@ class RQ extends BaseModule {
     }
 
     handleLocalData(data) {
-        
-        const reg_Sound = /\w\w \w\w e0 ea/gm;
-        const reg_Sensor = /f3 \w\w e\w f3/gm;
+
+        var data_str = JSON.stringify(data);
+        console.log(data);
+
+        const reg_Sound = /\w+,\w+,224,234/gm;
+        const reg_Sensor = /243,\w+,22\d,243/gm;
+
+        var soundArr = data_str.match(reg_Sound);
+        var sensorArr = data_str.match(reg_Sensor);
+
+        if(soundArr != null)
+        {
+            for(var i = 0; i < soundArr.length; i++)
+            {
+                var soundData = soundArr[i].split(',');
+
+                if( soundData[2] == "224" && soundData[3] == "234")
+                {
+                    this.returnData['I'] = {
+                        type : this.deviceTypes.RQ_Sound,
+                        mode : 1,
+                        value : Number(soundData[0]),
+                    }
+                }
+            }
+        }
+
+        if(sensorArr != null)
+        {
+            for(var i = 0; i < sensorArr.length; i++)
+            {
+                var sensorData = sensorArr[i].split(',');
+
+                if( sensorData[2] == "224")
+                {
+                    this.returnData['L1'] = {		
+                        type : this.deviceTypes.RQ_Touch_1,
+                        mode : 1,
+                        value : ((sensorData[1]=="255")?1:0),
+                    }
+                }
+                else if( sensorData[2] == "225")
+                {
+                    this.returnData['K1'] = {		
+                        type : this.deviceTypes.RQ_Inf_1,
+                        mode : 1,
+                        value : Number(sensorData[1]),
+                    }
+                }
+                else if( sensorData[2] == "226")
+                {
+                    this.returnData['L2'] = {		
+                        type : this.deviceTypes.RQ_Touch_2,
+                        mode : 1,
+                        value : ((sensorData[1]=="255")?1:0),
+                    }
+                }
+                else if( sensorData[2] == "227")
+                {
+                    this.returnData['K2'] = {		
+                        type : this.deviceTypes.RQ_Inf_2,
+                        mode : 1,
+                        value : Number(sensorData[1]),
+                    }
+                }
+            }
+        }
 
         if(data.length == 0x02 && data[0] == 0x0 && this.curr_pos != data[1])
         {
@@ -609,56 +674,7 @@ class RQ extends BaseModule {
             }
             this.get_pos = Number(data[1]);
         }
-        else if(data.length == 0x02 && data[0] == 0xf3)
-        {
-            if(this.isTouchGroupNo == 0x0)
-            {
-                this.returnData['L1'] = {
-                    type : this.deviceTypes.RQ_Touch_1,
-                    mode : 1,
-                    value : ((data[1]==0xff)?1:0),
-                }
-            }
-            else if(this.isTouchGroupNo == 0x1)
-            {
-                this.returnData['L2'] = {
-                    type : this.deviceTypes.RQ_Touch_2,
-                    mode : 1,
-                    value : ((data[1]==0xff)?1:0),
-                }
-            }
-            else if(this.isTouchGroupNo == 0x2)
-            {
-                this.returnData['K1'] = {
-                    type : this.deviceTypes.RQ_Inf_1,
-                    mode : 1,
-                    value : Number(data[1])
-                }
-            }
-            else if(this.isTouchGroupNo == 0x3)
-            {
-                this.returnData['K2'] = {
-                    type : this.deviceTypes.RQ_Inf_2,
-                    mode : 1,
-                    value : Number(data[1])
-                }
-            }
-            this.isTouchGroupNo++;
-        }
-        else if(data.length == 0x02 && data[1] == 0x0 && this.isTouchGroupNo == 0x4)
-        {
-            this.returnData['I'] = {
-                type : this.deviceTypes.RQ_Sound,
-                mode : 1,
-                value : Number(data[0]),
-            }
-            this.isTouchGroupNo++;
-        }
-
-        if( this.isTouchGroupNo % 5 == 0)
-        {
-            this.isTouchGroupNo = 0;
-        }
+       
     }
 
     // Web Socket(엔트리)에 전달할 데이터
@@ -806,9 +822,6 @@ class RQ extends BaseModule {
                             {
                                 let buf = this.SetServoPosion(Number(map1.motor), Number(map1.position), 2);
                                 this.sp.write(buf);
-                                console.log("++++++++++++++++++++++++++++++");
-                                console.log(buf);
-                                console.log("++++++++++++++++++++++++++++++");
                             }
                         }
                         break;
@@ -853,6 +866,7 @@ class RQ extends BaseModule {
                                 }
                             }
                             break;
+
                     default:
                         ret = false;
                 }
@@ -1016,13 +1030,11 @@ class RQ extends BaseModule {
         if (!this.isSensing) {
             this.isSensing = true;
 
-/*
             for(let i = 0; i< 10; i++)
             {
-                let buf = this.GetServoPosition(1);
+                let buf = this.GetServoPosition(i);
                 this.sp.write(buf);
             }
-*/
 
             Object.keys(this.SENSOR_MAP).filter((p) => {
 
@@ -1048,10 +1060,6 @@ class RQ extends BaseModule {
                         var buf = this.GetMic();
                         this.sp.write(buf);
                         break;  
-                    case 'J':
-                        var buf = this.GetRemote();
-                        this.sp.write(buf);
-                        break;
                 }
             });
 
